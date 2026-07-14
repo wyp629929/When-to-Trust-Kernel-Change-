@@ -1,0 +1,110 @@
+{
+  "poly_w32": {
+    "cka_mean": 0.9117,
+    "cka_std": 0.0141,
+    "frob_mean": 26.2,
+    "frob_std": 2.0
+  },
+  "poly_w64": {
+    "cka_mean": 0.9754,
+    "cka_std": 0.0029,
+    "frob_mean": 13.2,
+    "frob_std": 0.8
+  },
+  "poly_w128": {
+    "cka_mean": 0.9948,
+    "cka_std": 0.0006,
+    "frob_mean": 5.6,
+    "frob_std": 0.3
+  },
+  "poly_w256": {
+    "cka_mean": 0.9993,
+    "cka_std": 0.0001,
+    "frob_mean": 2.2,
+    "frob_std": 0.2
+  },
+  "poly_w512": {
+    "cka_mean": 0.9999,
+    "cka_std": 0.0,
+    "frob_mean": 2.7,
+    "frob_std": 0.4
+  },
+  "poly_w1024": {
+    "cka_mean": 1.0,
+    "cka_std": 0.0,
+    "frob_mean": 1.1,
+    "frob_std": 0.5
+  },
+  "highfreq_w32": {
+    "cka_mean": 0.8543,
+    "cka_std": 0.0135,
+    "frob_mean": 93.0,
+    "frob_std": 8.3
+  },
+  "highfreq_w64": {
+    "cka_mean": 0.9375,
+    "cka_std": 0.012,
+    "frob_mean": 51.3,
+    "frob_std": 7.1
+  },
+  "highfreq_w128": {
+    "cka_mean": 0.984,
+    "cka_std": 0.0026,
+    "frob_mean": 21.5,
+    "frob_std": 2.4
+  },
+  "highfreq_w256": {
+    "cka_mean": 0.996,
+    "cka_std": 0.0001,
+    "frob_mean": 9.0,
+    "frob_std": 1.1
+  },
+  "highfreq_w512": {
+    "cka_mean": 0.9996,
+    "cka_std": 0.0001,
+    "frob_mean": 1.8,
+    "frob_std": 0.2
+  },
+  "highfreq_w1024": {
+    "cka_mean": 0.9999,
+    "cka_std": 0.0,
+    "frob_mean": 0.8,
+    "frob_std": 0.1
+  },
+  "gmm_w32": {
+    "cka_mean": 0.9962,
+    "cka_std": 0.0016,
+    "frob_mean": 19.8,
+    "frob_std": 8.2
+  },
+  "gmm_w64": {
+    "cka_mean": 0.9919,
+    "cka_std": 0.0041,
+    "frob_mean": 45.2,
+    "frob_std": 12.8
+  },
+  "gmm_w128": {
+    "cka_mean": 0.9933,
+    "cka_std": 0.0031,
+    "frob_mean": 52.1,
+    "frob_std": 3.9
+  },
+  "gmm_w256": {
+    "cka_mean": 0.9988,
+    "cka_std": 0.0005,
+    "frob_mean": 28.5,
+    "frob_std": 4.9
+  },
+  "gmm_w512": {
+    "cka_mean": 0.9988,
+    "cka_std": 0.0006,
+    "frob_mean": 23.0,
+    "frob_std": 5.7
+  },
+  "gmm_w1024": {
+    "cka_mean": 0.9998,
+    "cka_std": 0.0001,
+    "frob_mean": 10.1,
+    "frob_std": 2.5
+  }
+}
