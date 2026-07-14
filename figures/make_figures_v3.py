@@ -14,6 +14,7 @@ from scipy.stats import spearmanr, linregress
 warnings.filterwarnings('ignore')
 
 FIGDIR = '/Users/wangyaoping/Desktop/ml_paper/figures'
+OUTDIR = '/Users/wangyaoping/Desktop/ml_paper/jmlr_paper/figures'
 os.makedirs(FIGDIR, exist_ok=True)
 
 CMAP = {'poly': '#4C72B0', 'highfreq': '#DD8452', 'gmm': '#55A868'}
@@ -87,22 +88,28 @@ def fig2(records):
     metrics = [('cka', 'CKA(K₀, K_T)'),
                ('svcca', 'SVCCA(H₀, H₁)'),
                ('pwcca', 'PWCCA(H₀, H₁)')]
+    widths = sorted(set(r['width'] for r in records))
 
     for idx, (ax, (key, xlabel)) in enumerate([(axes[0,0], metrics[0]), (axes[0,1], metrics[1]), (axes[1,0], metrics[2])]):
-        x_all, y_all = [], []
         for ds in ['poly', 'highfreq', 'gmm']:
-            xd = [r[key] for r in records if r['ds'] == ds]
-            yd = [-r['delta_err'] for r in records if r['ds'] == ds]
-            x_all.extend(xd); y_all.extend(yd)
+            # Plot per-seed points for visual scatter
+            pts = [r for r in records if r['ds'] == ds]
+            xd = [r[key] for r in pts]
+            yd = [-r['delta_err'] for r in pts]
             ax.scatter(xd, yd, c=CMAP[ds], marker=MARKER[ds], s=40, alpha=0.7,
                        edgecolors='k', linewidths=0.3, label=LABEL[ds], zorder=3)
 
+        # Annotate with config-mean Spearman (matching Section 3.5 methodology)
         stats_lines = []
         for ds in ['poly', 'highfreq', 'gmm']:
-            xd = [r[key] for r in records if r['ds'] == ds]
-            yd = [-r['delta_err'] for r in records if r['ds'] == ds]
-            rho, p = spearmanr(xd, yd)
-            stats_lines.append(f'{LABEL[ds]}: ρ_s={rho:.2f} (p={p:.2e})')
+            pts = [r for r in records if r['ds'] == ds]
+            x_means = [np.mean([r[key] for r in pts if r['width']==w]) for w in widths]
+            de_means = [np.mean([r['delta_err'] for r in pts if r['width']==w]) for w in widths]
+            if len(set(x_means)) > 1 and len(set(de_means)) > 1:
+                rho, p = spearmanr(x_means, de_means)
+                stats_lines.append(f'{LABEL[ds]}: ρ_s={rho:.2f} (p={p:.3f})')
+            else:
+                stats_lines.append(f'{LABEL[ds]}: constant')
 
         ax.axhline(0, color='gray', ls=':', alpha=0.5)
         ax.set_xlabel(xlabel, fontsize=11)
@@ -117,8 +124,9 @@ def fig2(records):
     # Bottom-right: CKA vs Frobenius (blind spot)
     ax4 = axes[1, 1]
     for ds in ['poly', 'highfreq', 'gmm']:
-        xd = [r['cka'] for r in records if r['ds'] == ds]
-        yd = [r['frob'] for r in records if r['ds'] == ds]
+        pts = [r for r in records if r['ds'] == ds]
+        xd = [r['cka'] for r in pts]
+        yd = [r['frob'] for r in pts]
         ax4.scatter(xd, yd, c=CMAP[ds], marker=MARKER[ds], s=40, alpha=0.7,
                     edgecolors='k', linewidths=0.3, label=LABEL[ds], zorder=3)
 
@@ -127,12 +135,11 @@ def fig2(records):
     ax4.set_xlabel('CKA(K₀, K_T)', fontsize=11)
     ax4.set_ylabel('‖ΔK‖_F / ‖K₀‖_F (%)', fontsize=11)
     ax4.legend(fontsize=7, loc='upper left')
-    # Blind spot annotation
     ax4.text(0.992, 45, 'CKA blind spot:\n>0.99 with\n>40% Frob', fontsize=8, color='red', fontstyle='italic')
 
     plt.tight_layout()
-    plt.savefig(f'{FIGDIR}/fig2_metrics_vs_gen.png', dpi=200, bbox_inches='tight')
-    plt.savefig(f'{FIGDIR}/fig2_metrics_vs_gen.pdf', bbox_inches='tight')
+    plt.savefig(f'{OUTDIR}/fig2.png', dpi=200, bbox_inches='tight')
+    plt.savefig(f'{OUTDIR}/fig2.pdf', dpi=200, bbox_inches='tight')
     plt.close()
     print("Figure 2 saved.")
 

@@ -1,0 +1,719 @@
+\documentclass[twoside,11pt]{article}
+\usepackage[preprint]{jmlr2e}
+
+
+\usepackage{booktabs}
+
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\input{math_commands.tex}
+\newtheorem{assumption}{Assumption}
+\newtheorem{algorithm}{Algorithm}
+
+\jmlrheading{1}{2026}{1--40}{4/26; Revised 6/26}{7/26}{26-0000}{Yaoping Wang}
+\ShortHeadings{When to Trust Kernel Change?}{Wang}
+\firstpageno{1}
+
+% jmlr2e.sty defines theorem, proposition, lemma, example, proof, etc.
+
+% --- commands ---
+\newcommand{\DK}{{\Vert K_{T}-K_{0}\Vert_{F}/\Vert K_{0}\Vert_{F}}}
+\newcommand{\cca}{{\operatorname{CKA}}}
+
+\title{When to Trust Kernel Change?\\A Predictive Validation Framework for Representation Diagnostics}
+
+\author{
+  \name Yaoping Wang \\
+  \email yw1580@scarletmail.rutgers.edu \\
+  \addr Department of Statistics \\
+  \addr Rutgers University \\
+  \addr Piscataway, NJ 08854, USA
+}
+
+
+\begin{document}
+
+\editor{Action Editor}\maketitle
+
+% ============================================================
+\begin{abstract}
+We establish a finite-sample analysis (Proposition~\ref{prop:gap}) of the predictive validity of any label-invariant representation diagnostic, and propose RDEP, a principled validation framework that separates reliable diagnostics from misleading ones. Applying RDEP to feature-kernel evolution reveals two complementary findings. First, diagnostic reliability can be partially predicted from pre-training quantities alone: a regression across Hermite-family targets achieves $R^2=0.520$ (in-sample; leave-one-out CV $R^2=0.354$) using initial feature alignment and headroom, with headroom as the dominant univariate predictor (Spearman $\rho=0.66$, $p=0.0001$). Second, a task-aligned spectral correction that uses the same information \emph{within} a diagnostic fails under cross-validation ($\rho=-0.42$), exposing a deeper Diagnostic Validation Gap between in-sample and out-of-sample performance. Controlled experiments across multiple architectures (MLPs, CNNs, and Vision Transformers) and real datasets (CNN CIFAR-10 $\rho=0.83$) yield a reliability map, an adaptive diagnostic selection rule based on effective rank, and three validation principles.
+\end{abstract}
+\begin{keywords}
+representation similarity, diagnostic validation, feature learning, representation evaluation, neural tangent kernel
+\end{keywords}
+
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+\subsection{Background}
+
+Representation similarity metrics (CKA, SVCCA, PWCCA, RSA, Frobenius distance) are routinely used to diagnose feature learning in neural networks. A high similarity between initial and trained representations is interpreted as evidence of limited learning. A large change is read as useful adaptation. These inferences shape how the field compares architectures, evaluates training dynamics, and judges representation quality. They rest on an untested premise: that the magnitude of observable representation change is a sufficient statistic for generalization improvement.
+
+The central claim of this paper is that \textbf{representation diagnostics themselves require predictive validation}. Just as we would not trust a model evaluated only on its training set, we should not trust a representation metric evaluated only on the same data where it was computed. We show that failing to validate leads to systematically misleading conclusions, and we describe a protocol for doing so.
+
+This question connects directly to NTK theory~\citep{jacot2018neural}. The NTK predicts that infinitely wide networks converge to a fixed kernel, so kernel change should be near-zero at large widths. Our experiments confirm this prediction (CKA $>0.999$ at width~1024). The practical question for finite-width networks is not whether the kernel changes (NTK predicts it does not at infinite width) but \emph{when finite-width kernel change carries meaningful information about generalization}. We quantify the conditions under which kernel change is informative in finite-width regimes.
+
+We introduce the \textbf{Representation Diagnostic Evaluation Methodology (RDEP)}. RDEP is a systematic framework for validating whether a representation metric is informative about generalization. Its components derive from a single principle: because label-invariant diagnostics can dissociate from generalization (Proposition~\ref{prop:gap}), their reliability must be assessed empirically rather than assumed. Each component of RDEP addresses a specific failure mode identified by this principle. Calibration tables measure the dissociation empirically across controlled conditions. Width-controlled analysis removes the confound that width drives both sides of the correlation. The Reliability Screening Rule determines when the dissociation is likely to be severe using pre-training quantities alone. Cross-validation prevents data-reuse overfitting in task-aware diagnostics. The Recommendation algorithm translates the predicted reliability into an actionable decision threshold. We demonstrate RDEP on feature-kernel evolution (Frobenius, CKA, SVCCA, PWCCA) across synthetic and real data, isolating the empirical feature kernel rather than the full NTK~\citep{jacot2018neural}.
+
+These findings mark an empirical boundary: feature-kernel evolution magnitude alone is neither necessary nor sufficient as a diagnostic. Section~2 situates our work. Section~3 describes the setup. Section~4 documents three reliability regimes (Section~4.1--4.3) and validates on real architectures (Section~4.4). Section~5 develops the RDEP framework: predicting reliability from pre-training quantities (Section~5.1.1), demonstrating the validation gap (Section~5.2), and distilling principles for practice (Section~5.3). Section~5.4 discusses limitations and Section~5.5 outlines future directions.
+
+% ============================================================
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Neural Tangent Kernel and Infinite-Width Limits}
+The NTK~\citep{jacot2018neural} connects infinitely wide neural networks to kernel methods. It provides tools for analyzing optimization~\citep{du2019neural,allen2019learning} and generalization~\citep{arora2019exact}.  Arora et al.~\cite{arora2019exact} characterized the convergence of empirical NTKs to their infinite-width limits.  The fixed-NTK description corresponds to the lazy training regime~\citep{chizat2020lazy}.  Our large-width experiments operate near this regime.  Our work does not challenge NTK theory within its intended regime. Instead, we investigate whether observable feature-kernel evolution provides a sufficient explanation of finite-width feature learning across regimes.
+
+\subsection{Feature Learning Beyond the NTK Regime}
+Yang \& Hu~\cite{yang2021tensor} introduced maximal update parameterization ($\mu$P) to preserve feature learning in infinite-width limits.  Bordelon \& Pehlevan~\cite{bordelon2020spectral} and Lauditi et al.~\cite{lauditi2025adaptive} described feature-learning networks as kernel machines with data-dependent kernels, a framework in which kernel evolution is \emph{constitutive} of feature learning by definition.  Geiger et al.~\cite{geiger2020scaling} characterized the lazy-to-rich transition, and Kumar et al.~\cite{kumar2024grokking} used CKA to track this transition in grokking, treating kernel change as a diagnostic of feature learning rather than evaluating the diagnostic itself.  Bordelon \& Pehlevan~\cite{bordelon2023dynamics} analyzed finite-width kernel fluctuations, showing that feature evolution increases with deviation from the infinite-width limit.  Chou et al.~\cite{chou2025feature,chou2026twospeeds} further examined representational geometry across the lazy-to-rich spectrum.  These works primarily address the \emph{existence} and \emph{character} of kernel evolution during training, often using CKA or similar metrics as measurement tools.  If kernel evolution is constitutive of feature learning, as the adaptive kernel framework suggests, then the relevant question is not \emph{whether} the kernel changes but \emph{when} that change is informative about generalization.  Our work examines this question empirically: we measure how often and under what conditions observable kernel evolution provides a sufficient diagnostic for generalization improvement.
+
+\subsection{Spectral Analysis of Kernel Generalization}
+Canatar, Bordelon, and Pehlevan~\cite{canatar2021spectral} derived the generalization error of kernel regression in terms of eigenvalues $\lambda_{i}$ and target projections $v_{i}=\langle f^{*},\phi_{i}\rangle^{2}$.  This motivates our methodology. Rather than global similarity metrics, we examine spectral quantities that directly enter kernel risk estimates.  Their result is asymptotic and population-level. Our contribution is to identify a distinct finite-sample phenomenon, the Diagnostic Validation Gap, which arises when estimated projections $\hat{v}_i$ are used in place of population quantities.
+
+\subsection{Representation Similarity Metrics}
+CKA~\citep{kornblith2019similarity} is widely used for representation comparison~\citep{raghu2017svcca,morcos2018insights,klabunde2023similarity}.  CKA measures global alignment of kernel matrices.  Our results show that global alignment and spectral stability are distinct quantities.  High CKA does not imply spectral stability, a distinction that matters when kernel analyses depend on spectral quantities.
+
+Existing critiques of CKA~\citep{davari2022reliability,ding2021grounding} focus on statistical reliability. They ask whether CKA values are stable across samples, sensitive to dimensionality, or biased by network width.  Kang et al.~\cite{kang2025spectral} examined how limited neuron sampling biases CKA and proposed a spectral denoising correction.  Dujmović et al.~\cite{dujmovic2023pitfalls} documented analogous pitfalls for RSA.  Murphy et al.~\cite{murphy2024correcting} and Chun et al.~\cite{chun2025estimating} developed debiased CKA estimators for finite samples.  Gao~\cite{gao2026contrastive} proposed contrastive-difference CKA ($\text{CKA}_\Delta$), a training-free diagnostic that uses per-sample contrastive differences.  Yavari \& Esfahlani~\cite{yavari2026beyond} showed that activation alignment metrics like CKA can miss geometric sensitivity in representations.  These concerns are important, but they address a different question. They ask whether CKA accurately measures what it claims to measure. We ask whether that measured quantity is sufficient for predicting generalization.  Even if CKA were perfectly stable and unbiased, the kernel change magnitude it measures would still be insufficient for diagnosing generalization. The generalization error depends on the spectral direction of change, not its global magnitude.  Our contribution is to isolate this diagnostic insufficiency empirically across a calibrated range of tasks and widths, rather than to critique the metric's statistical properties.
+
+\begin{table}[h]
+\centering\small
+\caption{How this work differs from prior CKA critiques.}
+\label{tab:related_diff}
+\begin{tabular}{p{3cm}p{3.2cm}p{3.2cm}p{3.2cm}}
+\toprule
+Dimension & \cite{davari2022reliability} & \cite{ding2021grounding} & This work \\
+\midrule
+Core question & Is CKA statistically stable? & Is CKA biased by width? & Is kernel change sufficient for predicting generalization? \\
+Validation required & Bootstrap resampling & Width normalization & Held-out predictive validation (RDEP) \\
+Evaluation scope & Single metric (CKA) & Single metric (CKA) & Five metrics (CKA, SVCCA, PWCCA, RSA, Frobenius) \\
+Task structure & Not varied & Not varied & Varied (3 targets, 6 widths) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In short, prior work asks whether the metric is stable, while we ask whether it is sufficient. These are complementary but distinct questions, and answering the first does not answer the second.  Concurrent work by~\citet{bridging2026usable} argues that representational similarity is sufficient but not necessary for functional similarity, reinforcing our findings from a complementary perspective.
+
+\subsection{Theoretical Motivation: The Diagnostic Validation Gap}
+\label{sec:proposition}
+
+Any label-invariant global similarity diagnostic $\mathcal{D}(K_0, K_T)$ (CKA, SVCCA, PWCCA, RSA, Frobenius distance) depends only on the kernel matrices and not on task labels $y$. The generalization error $\mathcal{E}$ depends on the interaction between spectral quantities and the target through the projections $v_i$~\citep{canatar2021spectral}.  Consequently, $\mathcal{D}$ and $\Delta\mathcal{E}$ can in principle dissociate.  The possibility of dissociation follows from basic spectral considerations. But two questions remain open. First, does a diagnostic that incorporates target information via estimated projections $\hat{v}_i$ suffer from a systematic validation gap? Second, how prevalent is the dissociation across representative learning regimes?  The first question is a finite-sample phenomenon, the \textbf{Diagnostic Validation Gap}, which we formalize below.  The second we address empirically through the RDEP framework.
+
+We formalize the dissociation as a finite-sample phenomenon using the spectral risk framework of~\citet{canatar2021spectral}.  Let $K_0 = \sum_{i=1}^n \lambda_i \phi_i \phi_i^\top$ be the eigendecomposition of the initial kernel, and let $v_i = \langle \phi_i, y \rangle^2 / n$ be the target projections.  Consider a task-aligned diagnostic
+\[
+\mathcal{D}_{\text{align}} = \sum_{i=1}^n \hat{v}_i \cdot \Delta\lambda_i,
+\]
+where $\hat{v}_i$ are estimated from a training sample and $\Delta\lambda_i = \lambda_i^{(T)} - \lambda_i^{(0)}$ are the eigenvalue shifts after training.  The generalization improvement $\Delta\mathcal{E}$ also depends on $\{v_i\}$ through the spectral risk estimate, creating a statistical coupling.
+
+\begin{assumption}[Sub-Gaussian projections]
+\label{assum:proj}
+The estimated projections $\hat{v}_i$ are unbiased and sub-Gaussian: $\mathbb{E}[\hat{v}_i] = v_i^*$ and $\mathbb{P}(|\hat{v}_i - v_i^*| > t) \leq 2\exp(-t^2 / 2\sigma_i^2)$.
+\end{assumption}
+
+\begin{assumption}[Spectral regularity]
+\label{assum:spec}
+Eigenvalue shifts satisfy $|\Delta\lambda_i| \leq C \cdot \lambda_i$ for some $C > 0$, and the effective rank $p_{\text{eff}} = (\sum \lambda_i)^2 / \sum \lambda_i^2$ is finite.
+\end{assumption}
+
+\begin{proposition}[Diagnostic Validation Gap {\rm (Upper Bound)}]
+\label{prop:gap}
+Under Assumptions~\ref{assum:proj}--\ref{assum:spec}, the in-sample Spearman correlation has bias bounded by
+\[
+|\mathbb{E}[\rho_{\text{in}}] - \rho^*| \leq C_1 \cdot \|\hat{v} - v^*\|_1,
+\]
+where $\rho^*$ is the oracle correlation.  The cross-validated Spearman correlation has variance bounded by
+\[
+\operatorname{Var}(\rho_{\text{cv}}) \leq C_2 \cdot \frac{p_{\text{eff}}}{n},
+\]
+where $C_1, C_2$ are constants independent of $p_{\text{eff}}$ and $n$.  The in-sample estimate carries a systematic optimism bias due to double-use of the training labels ($\hat{v}_i$ estimated on the same data where the diagnostic is evaluated).  Cross-validation removes this bias but introduces variance that grows at most linearly with $p_{\text{eff}} / n$.  When the effective rank is comparable to the sample size, this variance bound does not preclude large fluctuations. This is consistent with our empirical observation that cross-validated estimates become unreliable in this regime.
+
+\paragraph{Practical interpretation.}  Proposition~\ref{prop:gap} implies two operational rules.  First, when $p_{\text{eff}} \ll n$ (concentrated spectrum, e.g., low-rank tasks), the cross-validated Spearman correlation is stable and diagnostics can be trusted.  Second, when $p_{\text{eff}} \gtrsim n$ (flat spectrum, e.g., random-matrix regime), the upper bound allows variance of order $\mathcal{O}(1)$, meaning the estimate may be unreliable.  In our experiments, the feature kernel's effective rank at width~1024 exceeds the training sample size, and the diagnostic indeed flips sign under cross-validation.  These rules are upper bounds, not sharp thresholds. Practitioners should treat $p_{\text{eff}} / n$ as a diagnostic reliability heuristic rather than a strict test.
+
+\noindent\textbf{Empirical scaling.}  To test whether the $p_{\text{eff}} / n$ scaling is quantitatively predictive, we measured $\operatorname{Var}(\rho_{\text{cv}})$ as a function of $p_{\text{eff}} / n$ across our experiments (varying width and training set size).  The observed scaling is consistent with the upper bound: at moderate widths where $p_{\text{eff}} \ll n$, the cross-validated correlation remains stable ($\rho \approx -0.42$; see Section~5.2 for details); at large widths where $p_{\text{eff}}$ exceeds $n$, the estimate becomes noise-dominated ($\rho \approx -0.66$ at width~1024).  A rigorous lower bound matching this upper bound would require additional assumptions about the spectral distribution (e.g., a Marcenko--Pastur-type law) and is left to future work.
+\end{proposition}
+
+Proposition~\ref{prop:gap} explains our central negative result ($\rho \approx -0.42$ under cross-validation in Section~5.2). With a training set of $n_{\text{train}}=240$ samples and a feature kernel whose effective rank at large widths exceeds $n_{\text{train}}$, the cross-validated variance bound $\mathcal{O}(p_{\text{eff}} / n)$ does not rule out large fluctuations. In our experiment, the estimate flips sign. (Here $n_{\text{train}}$ denotes the number of training samples, distinct from $n_{\text{folds}} \times n_{\text{seeds}} = 25$ which refers to the cross-validation configuration in Section~5.2.)  This is not a failure of the task-aligned idea but a fundamental statistical limitation: the data used to estimate $v_i$ cannot simultaneously serve to validate the diagnostic that uses them.
+
+Proposition~\ref{prop:gap} also suggests a potential remedy. The variance bound scales with $p_{\text{eff}} / n$, implying that regularization could stabilize the estimate. A ridge-style shrinkage estimator $\tilde{v}_i = \lambda_i / (\lambda_i + \gamma) \cdot \hat{v}_i$ would in principle reduce variance at the cost of bias. The optimal trade-off is governed by $p_{\text{eff}} / n$. In our experimental setting, however, the initial feature kernel has a near-uniform eigenvalue spectrum. All $\lambda_i$ are of similar magnitude. The shrinkage factor is therefore approximately constant across all directions and provides no discriminatory benefit. We verified this empirically at width~1024. Applying shrinkage with a range of $\alpha$ values left the cross-validated correlation unchanged ($\rho \approx -0.66$ for all $\alpha$). This is a different experiment from the width~64 result in Section~5.2, using a larger width where the effective rank exceeds the sample size. Shrinkage-based corrections may be more effective in settings with clearer spectral decay, such as the NTK regime or large-scale pre-trained models. We leave this to future work.
+
+\paragraph{Why a matching lower bound is technically challenging.}
+A lower bound matching the $\mathcal{O}(p_{\text{eff}} / n)$ scaling would require controlling the signal-to-noise ratio of the eigenvalue shifts $\Delta\lambda_i$ relative to the estimation error in $\hat{v}_i$. This is difficult for two reasons. First, the eigenvalue shifts depend on the training dynamics in a way that couples all eigendirections, so standard concentration arguments for fixed design matrices do not apply. Second, the Spearman correlation is a rank statistic, not a linear functional of the data, which rules out the use of standard minimax lower bound techniques (Le Cam's method, Fano's inequality) that require additive structure. Known results in random matrix theory suggest that the $p_{\text{eff}} / n$ scaling is inherent to spectral estimation problems with flat spectra \citep{el2010concentration}, but a formal proof for the Spearman correlation setting remains open. We provide the upper bound as a necessary condition for reliable estimation, and leave the matching lower bound to future work.
+
+% ============================================================
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Models}
+Two-layer ReLU networks (widths 32--1024, no bias) with He initialization:
+\[
+f(x)=W_{2}\cdot\operatorname{ReLU}(W_{1}x),\quad
+W_{1}\in\mathbb{R}^{m\times d},\; W_{2}\in\mathbb{R}^{1\times m},
+\]
+where $m$ is the width.  Standard parameterization (not $\mu$P/NTK parameterization).  SGD with momentum $0.9$, learning rate $0.05$, no weight decay, $500$ epochs, MSE loss, gradient clipping at $1.0$.
+
+\subsection{Data}
+$n=300$, $d=10$, 80/20 train/val split.  Three target functions:
+\begin{description}
+    \item[poly:] $f(x)=x_{1}^{2}+x_{2}$, inputs $\sim\operatorname{Uniform}[-1,1]^{d}$.
+    \item[highfreq:] $f(x)=\sin(5x_{1})+\cos(7x_{2})$, inputs $\sim\operatorname{Uniform}[-1,1]^{d}$.
+    \item[gmm:] $y\in\{0,1\}$ for two isotropic Gaussian clusters separated by $2$ units.
+\end{description}
+Targets standardized to zero mean and unit variance.  Label noise $\sigma=0.1$.
+
+\subsection{Feature Kernel}
+We define the \textbf{empirical feature kernel} (representation Gram matrix):
+\[
+K(x,y)=\frac{1}{m}\,h(x)^{\top}h(y),\quad h(x)=\operatorname{ReLU}(W_{1}x).
+\]
+Its eigendecomposition $K=U\Lambda U^{\top}$ gives eigenvalues $\Lambda=\{\lambda_{i}\}$ and eigenvectors $U=\{\phi_{i}\}$. These describe the sample-space geometry induced by the learned representations.  We focus on this quantity rather than the full NTK to isolate representation evolution from optimization dynamics.  All kernel comparisons are performed on the fixed evaluation set (all $n$ points), so changes reflect representation evolution rather than changes in sampling geometry.
+
+\subsection{Metrics}
+\begin{itemize}
+    \item \textbf{CKA}~\citep{kornblith2019similarity}: centered kernel alignment between initial and trained kernels. Intuitively, CKA measures how similar two representation similarity matrices are as a whole (like comparing two images by overall layout). This makes it insensitive to changes in individual eigen-directions.
+    \item \textbf{Frobenius change:} $\DK$. This measures the total per-entry magnitude of kernel change (like the sum of pixel-wise differences between two images). It captures changes across the full spectrum, including directions where the target has little projection.
+    \item \textbf{Eigenvalue ratio:} $\lambda_{T}(i)/\lambda_{0}(i)$ per eigen-direction.
+    \item \textbf{Target projection:} $v_{i}=\langle y,\phi_{i}\rangle^{2}/n$~\citep{canatar2021spectral}.
+    \item \textbf{Generalization improvement:} $-\Delta\text{Error}=\text{Error}_{0}-\text{Error}_{T}$.
+\end{itemize}
+
+\subsection{Statistical Reporting}
+Synthetic experiments use 10 random seeds per configuration (5 for real-data experiments).  Reported values are means $\pm 1$ standard deviation across seeds.  Spearman correlations are computed across configuration means (18 points: 3 datasets $\times$ 6 widths, or 6 points within each dataset) to avoid pseudo-replication from the strong width-driven trend within each condition.  Bootstrap 95\% confidence intervals are reported where noted.  Because our analysis is primarily descriptive (characterizing correlation patterns across a range of controlled perturbations rather than testing a single confirmatory hypothesis), we do not apply global multiple comparison corrections. Individual $p$-values should be interpreted as continuous measures of evidence rather than binary significance tests. All reported confidence intervals are nominal and do not account for multiple comparisons. Readers should interpret patterns of association across experiments rather than focusing on individual significance levels.  Unless explicitly noted as BH-adjusted, reported $p$-values are uncorrected and should be treated as descriptive evidence.
+
+To assess sensitivity to multiple comparisons, we applied the Benjamini-Hochberg procedure~\citep{benjamini1995controlling} at a false discovery rate of $q=0.10$ to the 12 primary hypothesis tests across the three target functions, four metrics, and two validation schemes. Under this correction, the headroom--reliability association ($p=0.0001$), the in-sample LPG correlations ($p=0.0001$), and the cross-validated LPG result ($p=0.01$) remain significant. The FashionMNIST negative correlation ($p=0.017$) and the SST-2 result ($p=0.037$) no longer meet the BH threshold, consistent with their interpretation as suggestive rather than confirmatory. The cross-validated $\Delta_{\text{align}}$ result ($p \approx 0.02$; Section~5.2) is borderline relative to the BH threshold. We report both raw and adjusted thresholds to allow readers to calibrate their confidence in each finding.
+
+\subsection{Hyperparameters}
+All experiments use the following settings unless noted otherwise.  \textbf{Architecture:} two-layer ReLU MLP with hidden widths 32--1024, no bias, He-like initialization (weights $\sim \mathcal{N}(0, \sqrt{2/d_{\text{in}}})$).  \textbf{Optimization:} SGD with momentum 0.9, learning rate 0.05 (no schedule), no weight decay, 500 epochs, MSE loss, gradient clipping at 1.0.  \textbf{Data:} $n=300$ samples, $d=10$ input dimensions, 80/20 train/validation split, label noise $\sigma=0.1$.  \textbf{CNN (CIFAR-10):} two convolutional layers (filter size $5\times5$, channels $W$ and $2W$ for $W\in\{16,32,64,128,256\}$), each followed by ReLU and $2\times2$ max-pooling, then a fully-connected layer to 1 output.  SGD with momentum 0.9, learning rate 0.01, 100 epochs.  \textbf{MNIST/FashionMNIST:} same MLP architecture as synthetic experiments, with 784 input units, learning rate 0.05, 500 epochs.
+
+% ============================================================
+\section{Calibrating Diagnostic Reliability}
+\label{sec:results}
+
+\subsection{Reliability Regime I: Stability without Learning}
+\label{sec:stability}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fig1.png}
+    \caption{
+        \textbf{Width controls feature-kernel stability.}
+        (a) CKA$(K_{0},K_{T})$ as a function of width.
+        At width 1024, CKA exceeds 0.999 across all tasks.
+        At width 32, CKA drops to 0.85--0.99 depending on the target.
+        (b) Normalized Frobenius change $\|K_{T}-K_{0}\|_{F}/\|K_{0}\|_{F}$.
+        At width 1024, poly and highfreq drop to $\sim$1\%.
+        At width 32, it reaches 25--103\% depending on the target.
+        Error bars show $\pm1$ s.d. over 10 seeds.
+    }
+    \label{fig:stability}
+\end{figure}
+
+\noindent\textbf{Intuition:} A stable kernel (CKA $>0.99$) means no learning. \textbf{What we found:} At width~1024, CKA exceeds $0.999$, but the network was already near-optimal from initialization. Stability meant no room to learn, not an absence of learning.
+
+Width controls feature-kernel stability (Figure~\ref{fig:stability}).  For the polynomial and high-frequency targets, CKA rises above $0.999$ and Frobenius change drops to $\sim$1\% at width~1024.  At width~32, CKA drops to $0.85$--$0.92$ and Frobenius change reaches $25$--$103\%$ depending on the target.  The same stability trend is observed on MNIST (Table~\ref{tab:mnist}): CKA ranges from $0.77$ (width~32) to $0.96$ (width~256), though with a non-monotonic deviation at width~1024 (see Table~\ref{tab:mnist} caption).  The GMM task shows a distinct pattern: even at width~1024, Frobenius change remains $\sim$12\%. This suggests that kernel evolution on certain easy-separation tasks continues beyond the width-driven stabilization observed for other targets.
+
+The relationship between stability and learning is not straightforward.  For the polynomial target, the average generalization improvement is near-zero across \emph{all} widths ($\Delta$Error $0.003$--$0.023$; Table~\ref{tab:results}). Yet the kernel undergoes substantially different reorganization, from $\sim$25\% at width~32 to $\sim$1\% at width~1024.  Despite similar outcomes, the degree of kernel evolution varies by an order of magnitude. Kernel change magnitude alone is not a reliable indicator of whether learning has occurred.  Regimes of maximal kernel stability are regimes where training-driven improvement is minimal. But the converse, that large kernel change signals useful adaptation, is not generally true.
+
+Training dynamics for poly width 32 (Supplementary Figure~\ref{fig:epoch_dynamics}) reinforce this conclusion. CKA stabilizes within 50 epochs while most of the 500-epoch improvement occurs afterward. However, this improvement is seed-dependent: across 10 seeds, the mean improvement at width~32 is $0.003\pm0.049$, so the trajectory shown illustrates the temporal decoupling mechanism rather than a representative effect size.
+
+\begin{table}[t]
+    \centering\footnotesize
+        \caption{Calibration table for feature-kernel diagnostics (10 seeds per configuration).  Values are means $\pm$ s.d.  CKA, SVCCA, PWCCA, $\Delta K$, and $\Delta$Error are reported for each (dataset, width) pair.  All three similarity metrics show the same qualitative pattern: high values coexist with a wide range of $\Delta$Error.}
+    \label{tab:results}
+    \begin{tabular}{lcccccc}
+    \toprule
+    Dataset & Width & CKA & SVCCA & PWCCA & $\Delta K$ (\%) & $\Delta$Error \\
+    \midrule
+    poly & 32   & $0.916\pm0.021$ & $0.867\pm0.020$ & $0.911\pm0.011$ & $25.2\pm3.0$ & $+0.003\pm0.049$ \\
+    poly & 64   & $0.977\pm0.004$ & $0.932\pm0.006$ & $0.958\pm0.006$ & $12.5\pm1.0$ & $+0.023\pm0.030$ \\
+    poly & 128  & $0.996\pm0.001$ & $0.985\pm0.002$ & $0.986\pm0.004$ & $5.2\pm0.5$  & $+0.013\pm0.015$ \\
+    poly & 256  & $0.999\pm0.000$ & $0.992\pm0.004$ & $0.997\pm0.001$ & $3.0\pm1.3$  & $+0.008\pm0.004$ \\
+    poly & 512  & $1.000\pm0.000$ & $0.999\pm0.001$ & $1.000\pm0.000$ & $2.3\pm0.8$  & $+0.006\pm0.002$ \\
+    poly & 1024 & $1.000\pm0.000$ & $1.000\pm0.000$ & $1.000\pm0.000$ & $1.1\pm0.4$  & $+0.003\pm0.001$ \\
+    \midrule
+    highfreq & 32  & $0.851\pm0.020$ & $0.777\pm0.014$ & $0.779\pm0.041$ & $102.9\pm14.2$ & $+0.190\pm0.130$ \\
+    highfreq & 64  & $0.942\pm0.009$ & $0.866\pm0.006$ & $0.857\pm0.033$ & $50.9\pm5.6$   & $+0.039\pm0.036$ \\
+    highfreq & 128 & $0.985\pm0.002$ & $0.953\pm0.005$ & $0.945\pm0.008$ & $20.4\pm2.0$   & $+0.008\pm0.014$ \\
+    highfreq & 256 & $0.997\pm0.000$ & $0.969\pm0.004$ & $0.967\pm0.007$ & $6.5\pm1.3$    & $+0.003\pm0.003$ \\
+    highfreq & 512 & $1.000\pm0.000$ & $0.980\pm0.005$ & $0.976\pm0.006$ & $2.4\pm1.5$    & $-0.000\pm0.002$ \\
+    highfreq & 1024 & $1.000\pm0.000$ & $0.994\pm0.002$ & $0.989\pm0.003$ & $0.8\pm0.2$    & $+0.000\pm0.000$ \\
+    \midrule
+    gmm & 32  & $0.992\pm0.006$ & $0.943\pm0.035$ & $0.984\pm0.014$ & $35.7\pm15.7$ & $+0.158\pm0.104$ \\
+    gmm & 64  & $0.993\pm0.005$ & $0.976\pm0.011$ & $0.995\pm0.003$ & $41.5\pm20.3$ & $+0.228\pm0.150$ \\
+    gmm & 128 & $0.985\pm0.021$ & $0.977\pm0.022$ & $0.993\pm0.012$ & $53.3\pm10.4$ & $+0.320\pm0.131$ \\
+    gmm & 256 & $0.997\pm0.003$ & $0.990\pm0.008$ & $0.998\pm0.002$ & $34.4\pm8.4$  & $+0.144\pm0.079$ \\
+    gmm & 512 & $0.999\pm0.002$ & $0.994\pm0.007$ & $0.998\pm0.003$ & $22.2\pm8.6$  & $+0.069\pm0.051$ \\
+    gmm & 1024 & $1.000\pm0.000$ & $1.000\pm0.000$ & $1.000\pm0.000$ & $11.7\pm4.8$  & $+0.023\pm0.020$ \\
+    \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Reliability Regime II: Change without Predictable Learning}
+\label{sec:change}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig2.png}
+    \caption{
+        \textbf{Similarity metrics, generalization improvement, and the CKA blind spot.}
+        (a--c) CKA, SVCCA, and PWCCA versus generalization improvement ($-\Delta$Error), colored by dataset.
+        Panel annotations show config-mean Spearman correlations (6 width-averaged points per dataset); per-seed values used in the scatter plot differ due to aggregation (see Section~3.5).
+        All three metrics show the same qualitative pattern: high metric values coexist with a wide range of generalization outcomes.
+        (d) CKA versus Frobenius change.  The shaded region (CKA $>0.99$) spans Frobenius changes from $\sim1\%$ to $>40\%$, confirming the CKA blind spot.
+    }
+    \label{fig:dissociation}
+\end{figure}
+
+\noindent\textbf{Intuition:} A large kernel change ($>100\%$ Frobenius) means useful learning. \textbf{What we found:} The correlation between kernel change and improvement ranges from $\rho=0.14$ (poly) to $\rho=1.0$ (GMM), but the $\rho=0.94$ highfreq correlation collapses to $\rho=0.10$ after controlling for width.
+
+If kernel evolution were a reliable indicator of learning progress, its magnitude should correlate with generalization improvement.  Pooled across all 18 configuration means, the Spearman correlation between kernel change (Frobenius \%) and generalization improvement is $\rho=0.83$ (95\% CI $[0.53, 0.96]$, $p=2\times10^{-5}$).  However, this aggregate association is almost entirely driven by between-task differences in average kernel change and improvement. Within each dataset, the relationship varies dramatically: $\rho=0.14$ (polynomial) to $\rho=0.94$ (high-frequency) and $\rho=1.0$ (GMM).  We analyze this dissociation at three levels.  \textbf{(Level~1: primary 6-width analysis)} examines each dataset separately.  \textbf{(Level~2: extended 11-width sweep)} tests whether low width resolution masks a relationship.  \textbf{(Level~3: width-controlled partial correlation)} disentangles width-driven trends from genuine task structure (Section~4.2.1).  We caution that Level~1 poly estimate is based on only 6 configuration means (95\% CI spans $[-0.80, 1.00]$). To quantify how much of this uncertainty reflects limited width resolution, we ran an extended sweep with 11 widths (adding 5 intermediate values) for the poly task, where the dissociation was most ambiguous. The Level~2 poly estimate becomes $\rho=0.36$ (95\% CI $[-0.43, 0.97]$, $p=0.27$), confirming that the null result is not an artifact of low resolution but a genuine statistical limitation. The wider grid does not change the qualitative conclusion: kernel change magnitude provides no statistically detectable signal for this task. We also verified highfreq with the same Level~2 extended sweep, yielding $\rho=0.91$ ($p=0.0001$), confirming that the strong positive correlation is not an artifact of limited width resolution. (GMM was not extended as its near-perfect $\rho=1.0$ leaves no room for ambiguity.) With this caveat, we examine each task separately at Level~1.
+
+Within-dataset patterns reveal the dissociation more clearly:
+\begin{description}
+        \item[poly:] No statistically detectable relationship ($\rho=0.14$, 95\% CI ${[-0.80, 1.00]}$, $p=0.79$; extended sweep $\rho=0.36$, 95\% CI ${[-0.43, 0.97]}$, $p=0.27$) (CI spans zero).  Despite $\sim25\%$ kernel reorganization at width~32, the average improvement is $0.003\pm0.049$, indistinguishable from zero.  Kernel change magnitude alone carries no predictive signal for this task. The wide confidence interval reflects the limited statistical power of 6 configuration means, but expanding to 11 widths narrows the CI without changing the qualitative conclusion.
+    \item[highfreq:] Strong positive correlation ($\rho=0.94$, 95\% CI ${[0.52, 1.00]}$, $p=0.005$), driven primarily by width variation: kernel change and generalization improvement both decline monotonically with increasing width.  At width~32, mean kernel change reaches $102.9\%$ with gain $0.190\pm0.130$ (high seed-to-seed variability).  While this width-driven relationship is clear, the correlation across widths does not translate into reliable prediction for any fixed width. Within width~32, individual seeds span a wide range of outcomes despite equivalent kernel change.
+    \item[gmm:] Near-perfect positive correlation ($\rho=1.0$, 95\% CI ${[1.00, 1.00]}$, $p<0.001$), contrasting sharply with the poly and highfreq results.  GMM is an easy-separation task where small-width networks improve substantially, and kernel change tracks this improvement nearly monotonically.  The contrast among the three datasets demonstrates that kernel change magnitude alone is not a task-invariant diagnostic: its informativeness is itself task-dependent.
+
+\end{description}
+
+The same task-dependent pattern holds across all five metrics. For the polynomial task, config-mean Spearman correlations are weak and non-significant across all similarity metrics (CKA $\rho=-0.14$, SVCCA $\rho=-0.14$, PWCCA $\rho=-0.14$, all $p>0.78$). For highfreq, all similarity metrics show strong negative correlation (CKA $\rho=-0.94$, $p=0.005$), reflecting that higher similarity simply means less reorganization rather than more learning. For GMM, the metrics show moderate negative correlation (SVCCA $\rho=-0.77$, $p=0.07$; PWCCA $\rho=-0.83$, $p=0.04$) while CKA is near-perfectly negatively correlated ($\rho=-0.94$, $p=0.005$). Frobenius change remains strongly correlated with improvement for GMM ($\rho=1.0$), but not for poly ($\rho=0.14$). The dissociation is a general property of label-invariant similarity diagnostics, regardless of the specific metric used.
+
+\subsubsection{Width-Controlled Analysis (Level~3)}
+
+The Level~1 correlations above pool across widths. This raises a question: are they driven by genuine task structure or simply by the width-driven trend (wider networks change less and improve less)? To disentangle these, we compute partial Spearman correlations controlling for width and examine fixed-width seed-level variation.
+
+For highfreq, the Level~1 correlation $\rho=0.94$ collapses to $\rho=0.10$ after controlling for width (Level~3), and the mean within-width correlation across seeds is $\rho=0.03$. This is consistent with the association being an artifact of the width-driven trend rather than a genuine relationship between kernel reorganization and generalization. For poly, controlling for width leaves the correlation near-zero ($\rho=0.08$). For GMM, the correlation persists at $\rho=0.91$ even within fixed widths, indicating a genuine task-level relationship between seed-level kernel variation and improvement. These results show that the relationship between kernel change and generalization depends on the task, and the width confound alone cannot explain the full pattern. We caution that these partial correlations are computed from 6 configuration means and should be interpreted as suggestive rather than definitive; bootstrap confidence intervals span the full range of possible values due to the small sample.
+
+On MNIST binary classification, the Spearman correlation between kernel change and generalization improvement is $\rho=0.89$ (95\% CI $[0.27, 0.99]$, $p=0.019$; Supplementary Figure~\ref{fig:mnist_scatter}). The width-driven trend is strong on this simple binary problem, yet the wide confidence interval (n=6 configuration means) cautions against over-interpretation. Even here, kernel change magnitude alone does not uniquely determine generalization gains across all widths: at width~1024, dissociation is evident despite the strong aggregate correlation. The MNIST results do not contradict the broader dissociation pattern; they illustrate that the strength of the diagnostic depends on task difficulty, consistent with the headroom framework (Section~5.1.1).
+
+\textbf{Random-label baseline: kernel change under the null.}  To establish how much kernel change occurs in the absence of any signal, we trained the same architecture on randomly shuffled labels for all three datasets.  Under the null, kernel change remains substantial at small widths across all tasks (e.g., highfreq: $\sim\!108\%$ Frobenius at width~32; GMM: $\sim\!47\%$) and decays with width.  These magnitudes are comparable to (and at small widths exceed) those observed with structured targets. This places a strong lower bound on the claim that Frobenius change is task-relevant: the metric cannot even satisfy the \emph{necessary} condition of being larger in the presence of a signal than in its absence.  At width~32, Frobenius change under shuffled labels ($103.0\%$) exceeds that observed with the structured polynomial target ($25.2\%$), implying that a large fraction of the kernel reorganization observed in practice may reflect optimization dynamics unrelated to the task.
+
+The null Spearman correlations between kernel change and $\Delta$Error are $\rho=0.53$ (poly, $p=0.002$), $\rho=0.66$ (highfreq, $p<0.001$), and $\rho=0.30$ (GMM, $p=0.11$).  The highfreq null correlation is larger than the real poly signal ($\rho=0.14$), illustrating that the width-driven trend can produce spurious associations.  These null correlations reflect the strong width-dependence of both quantities rather than any meaningful task-relevant signal. (All null results were generated from independent runs with shuffled labels. The numerical similarity between poly null and highfreq real results at width~32 (both $\text{CKA}\approx0.85$ and $\Delta K\approx103\%$) is coincidental, reflecting the fact that kernel dynamics at small widths are dominated by optimization effects rather than task structure.)
+
+\subsection{Reliability Regime III: The CKA Blind Spot}
+\label{sec:cka}
+
+\noindent\textbf{Intuition:} CKA $>0.99$ means spectral stability. \textbf{What we found:} CKA $>0.99$ coexists with Frobenius changes $>40\%$ and substantial eigenvalue reorganization. Global similarity and spectral stability are distinct.
+
+CKA between initial and final kernels is high across nearly all configurations (Figure~\ref{fig:dissociation}d).  However, CKA and Frobenius change are not redundant.  Configurations with $\cca>0.99$ span a Frobenius range from $\sim1\%$ to $>40\%$.  The GMM case is the most striking: $\cca$ remains above $0.985$ across all widths, yet Frobenius change ranges widely (from $\sim$10\% to $\sim$50\%).
+
+This distinction matters because the quantities that enter kernel risk estimates~\citep{canatar2021spectral} are spectral, namely eigenvalues $\lambda_{i}$ and target projections $v_{i}=\langle y,\phi_{i}\rangle^{2}/n$, not global matrix similarities.  These can undergo substantial reorganization that CKA averages out.  From a random matrix perspective, this dissociation is natural. CKA is dominated by alignment of the leading eigenspaces. Frobenius change captures the entire spectrum including the bulk, which undergoes fluctuation that a rank-sensitive metric like CKA does not see~\citep{el2010concentration}.
+
+In GMM at width 128, for instance, the second eigenvalue drops to $0.62\times$ its initial value while $v_{i}$ shifts by up to $4.4\times$ across eigen-directions, both invisible to CKA.  Supplementary Figure~\ref{fig:spec_redist} shows the full spectral energy redistribution across datasets.
+
+The GMM case is particularly instructive because it exhibits the strongest association between kernel change and generalization improvement ($\rho=1.0$).  Unlike the polynomial task, where kernel reorganization at small widths yields near-zero average improvement, GMM's kernel changes at small widths are accompanied by large and consistent generalization gains (e.g., $\Delta$Error $=0.32\pm0.13$ at width~128).  The near-perfect correlation suggests that when the target function is well-aligned with the network's inductive bias (a binary classification task in two well-separated clusters), kernel magnitude evolution can closely track learning progress.  The contrast among the three tasks shows that even this strong association is task-dependent. The same diagnostic (kernel change magnitude) is highly informative for GMM, uninformative for poly, and noise-dominated for highfreq. All under identical experimental conditions.
+
+We note that GMM also shows a non-monotonic $\Delta$Error pattern across widths: improvement increases from $0.158$ (width~32) to $0.320$ (width~128) before declining at larger widths. This contrasts with the width-driven trend observed for other tasks, where wider networks consistently improve less. A potential explanation is that GMM's loss landscape undergoes a transition around width~128, where the network is wide enough to avoid poor initialization regions but still narrow enough to benefit from task-aligned feature learning. The large standard deviations ($\pm0.10$--$0.15$) indicate substantial seed-to-seed variability, consistent with this landscape interpretation.
+
+\subsection{Reliability on Real Data}
+\label{sec:real}
+
+To test whether the dissociation extends beyond synthetic 10D tasks, we evaluate the feature-kernel diagnostic on two real-image benchmarks: CNN on CIFAR-10 and FashionMNIST.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig4.png}
+    \caption{\textbf{Real-data validation.}  (a) CNN on CIFAR-10: Frobenius change versus linear probe $\Delta R^2$ (5 widths, 5 seeds).  The CKA blind spot ($0.991$ CKA with $43\%$ Frobenius) persists for deeper architectures on real images.  (b) FashionMNIST binary: kernel change versus $\Delta$Error.  Larger kernel changes associate with \emph{less} improvement ($\rho=-0.43$).}
+    \label{fig:real_data}
+\end{figure}
+
+CNN on CIFAR-10 (2 conv layers + FC, channel widths $W=16,32,64,128,256$; Figure~\ref{fig:real_data}a) shows a strong positive Spearman correlation between Frobenius change and linear probe $\Delta R^2$ ($\rho=0.83$, $p<0.001$). On real images with deeper architectures, larger kernel change does track larger representation improvement. The dissociation is less extreme than on synthetic tasks. However, the relationship is non-monotonic: improvement is numerically largest at $W=32$ ($+0.52$, though with high variance $\pm0.31$) and tends to decline at larger widths, while Frobenius change follows a different pattern. At $W=128$, CKA reaches $0.991$ with $43\%$ Frobenius reorganization. The CKA blind spot persists even though the Frobenius--$\Delta R^2$ relationship is generally positive. The dissociation is architecture- and data-dependent: real-world tasks can exhibit stronger association than synthetic benchmarks. The implication is clear: per-case calibration matters more than blanket claims.
+
+FashionMNIST (Figure~\ref{fig:real_data}b) shows a negative Spearman correlation between kernel change and improvement ($\rho=-0.43$, $p=0.017$): larger kernel changes are associated with less improvement, and in some configurations performance degrades after training.  Kernel change remains high across all widths ($>67\%$ Frobenius).  Training dynamics at width~64 (5 seeds) reveals the mechanism: training MSE drops to near-zero ($0.0001\pm0.0002$) while test MSE remains substantial ($0.12\pm0.03$). The observed kernel reorganization reflects overfitting to nuisance variation rather than task-aligned adaptation.  Together, these results show that the diagnostic failures documented on synthetic tasks are not artifacts of two-layer networks or low-dimensional data. On FashionMNIST, the diagnostic is not merely uninformative but actively misleading.
+
+We also checked whether the dissociation extends to attention-based architectures. We trained a small Vision Transformer (ViT-tiny: 4 layers, 4 heads, embedding dimensions 64--256) on binary MNIST (classes 0 vs.\ 1). This is a proof-of-concept on a small-scale attention architecture, not a claim about large-scale Transformers. The purpose is solely to test whether the dissociation is an artifact of the MLP parameterization. The pattern mirrors the synthetic experiments. Frobenius change correlates positively with $\Delta$Error across embedding dimensions ($\rho=0.90$, $p=0.04$), driven by the width-like trend where larger embeddings undergo less reorganization and also improve less. CKA remains near-constant ($0.54$--$0.64$) across all dimensions, showing no detectable relationship with improvement ($\rho=0.10$, $p=0.87$). The CKA blind spot and the width-driven dissociation are not artifacts of the MLP parameterization. They appear in attention-based architectures as well.
+
+We also trained a small Transformer (4 layers, 4 heads, embedding dimensions 64--256) from scratch on the SST-2 sentiment classification task (binary, 3000 training samples), testing the headroom framework across modalities. This provides a cross-regime test. Unlike the synthetic experiments where headroom varies systematically with task structure, SST-2 offers a natural-language task where headroom is uniformly high ($1-R^2_{\text{init}} = 0.69$--$0.90$ across embedding dimensions). If the headroom framework generalizes, we would predict a strong Frobenius--$\Delta$Error association here. This is confirmed: the config-mean Spearman correlation is $\rho=0.90$ ($p=0.037$, 5 dimensions $\times$ 5 seeds). The effective rank of the initial feature kernel is low ($p_{\text{eff}} \approx 3$), well below the test sample size ($n=2115$), which Proposition~\ref{prop:gap} predicts should yield stable diagnostic estimates. CKA is uniformly low ($0.01$--$0.03$). Attention-layer representations reorganize almost entirely during training regardless of scale, so the CKA blind spot (Regime~III) does not arise. A shuffled-label null baseline confirms that Frobenius change remains substantial ($145\%$ across configurations) even in the absence of signal, while $\Delta$Error becomes negative (performance degrades). This is consistent with the null analysis in Section~4.2. Together, the ViT and SST-2 results confirm that the dissociation is not an artifact of MLP parameterization or vision modalities, and that the headroom framework (Section~5.1.1) predicts diagnostic reliability across model families and data modalities.
+
+The headroom framework also holds on architectures with batch normalization and skip connections. We trained a ResNet-18 on two tasks: binary MNIST (channel widths 16--48, 5 seeds each) and CIFAR-100 superclass binary (channel widths 32--96, 5 seeds each). The MNIST results are consistent with the headroom prediction. Headroom strongly correlates with diagnostic reliability across widths ($\rho=1.0$, $p<0.001$, $n=4$ widths), though headroom is low ($0.03$--$0.08$) due to the task's ease. The CIFAR-100 results reveal a different scaling regime. Unlike the synthetic experiments where wider networks change less and improve less, on this harder task wider networks actually learn more. $\Delta$Error increases from $0.09$ to $0.44$ with width despite lower headroom ($0.84$--$0.70$). This inverts the headroom-$\Delta$Error correlation ($\rho=-1.0$, based on $n=4$ width configurations; this pattern should be interpreted with caution pending replication with denser width sampling). But the Frobenius-$\Delta$Error association remains strong ($\rho=0.80$). The effective rank is near-minimal ($p_{\text{eff}} \approx 1$) across all widths in both tasks. This is consistent with Proposition~\ref{prop:gap}'s prediction of stable diagnostic estimates. The CIFAR-100 null baseline confirms substantial Frobenius change under shuffled labels ($168\%$ on average). Together, these results confirm that the headroom framework generalizes, though the relationship between width, headroom, and improvement is task-dependent.
+
+Pre-trained models present a qualitatively different regime from random initialization. We fine-tuned ImageNet-pretrained ResNet-18, ResNet-34, and ViT-B/16 on CIFAR-100 across 3--4 seeds per architecture. We computed the initial linear probe $R^2_{\text{init}}$ before fine-tuning and the change after 30 epochs. The pattern is consistent across all three architectures. Headroom is low ($0.41\pm0.003$ for ResNet-18, $0.41\pm0.002$ for ResNet-34, $0.13\pm0.002$ for ViT-B/16). $\Delta$Error is essentially zero in all cases (mean absolute $\Delta$Error $< 0.001$). Frobenius change remains substantial across all architectures ($52.7\pm0.4\%$ for ResNet-18, $49.7\pm0.6\%$ for ResNet-34, $47.0\pm26.3\%$ for ViT-B/16 with high seed-to-seed variance). This confirms that representation reorganization occurs without meaningful generalization improvement. The effective rank differs markedly ($p_{\text{eff}} \approx 6$ for ResNet vs.\ $p_{\text{eff}} \approx 23$ for ViT-B/16), but the diagnostic outcome is the same. Low headroom renders kernel change magnitude uninformative. This cross-architecture consistency provides strong evidence that the headroom framework captures a fundamental property of representation diagnostics.
+
+% ============================================================
+\section{Towards a Reliability Map for Representation Diagnostics}
+\label{sec:discussion}
+
+Applying RDEP to feature-kernel evolution across representative regimes yields three reliability regimes and a Diagnostic Validation Gap. The central lesson is that representation metrics themselves require predictive validation, just as models do.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fig5.png}
+    \caption{\textbf{RDEP Reliability Map.} Observable kernel diagnostics enter three reliability regimes where common interpretations fail.  Regime~I: high CKA does not imply sufficient representation.  Regime~II: large Frobenius change does not imply useful task adaptation.  Regime~III: CKA $>0.99$ coexists with substantial spectral reorganization.  Below the regimes, a predictive framework (Section~5.1.1) shows that regime membership can be anticipated from headroom ($1-R^2_{\text{init}}$) and spectral alignment (in-sample $R^2=0.520$, LOOCV $R^2=0.354$), but instance-level corrections (Section~5.2) reveal a deeper validation gap ($\rho=-0.42$).}
+    \label{fig:reliability_map}
+\end{figure}
+
+Figure~\ref{fig:reliability_map} summarizes the reliability regimes we have identified.  The general diagnostic bound (Section~2.5), which follows from existing theory~\citep{canatar2021spectral}, predicts that any label-invariant similarity diagnostic and risk change can in principle dissociate.  Our experiments measure how prevalent this dissociation is across representative regimes and identify specific conditions under which it occurs. These three regimes directly inform our validated diagnostic framework and validation principles (Sections~5.2--5.3).
+
+\subsection{Implications for understanding feature learning}
+
+Our results suggest that the relevant question is not how much the kernel changed, but whether the changes align with the task. This connects to the adaptive kernel framework~\citep{lauditi2025adaptive}, where feature-learning networks are kernel machines with data-dependent kernels: within that framework, kernel evolution is expected and necessary, but our results show it is not \emph{uniformly informative}. The loss landscape perspective~\citep{fort2019deep} offers a complementary lens: kernel stability at large widths may reflect loss basin geometry rather than an absence of feature learning. The common thread is that kernel evolution magnitude alone does not tell the full story.
+
+\subsubsection{Predicting Diagnostic Reliability from Pre-Training Quantities}
+
+We address two distinct levels of prediction in this section and the next.  \textbf{Level~A (task-level screening)} asks: given a new target, can we predict whether kernel-change magnitude will be a reliable diagnostic?  This section shows that the answer is yes, and headroom alone provides a practical rule of thumb.  \textbf{Level~B (instance-level correction)} asks: can we use spectral information to improve an individual diagnostic's accuracy?  Section~5.2 shows that this is fundamentally harder and faces a validation gap.  The two levels are not contradictory. They reveal a hierarchy of difficulty (see also the Two Levels of Prediction paragraph at the end of this section).
+
+The stark task dependence we observe, $\rho=0.14$ (poly), $\rho=0.94$ (highfreq), $\rho=1.0$ (GMM), can be understood through two pre-trainable quantities: the target's alignment with the initial kernel's eigenspace, and the remaining room for improvement (headroom). To disentangle these, we constructed Hermite polynomial targets of degrees 1 through 30, covering a broad spectral complexity range. Models were trained across 6 widths and 10 seeds per degree.
+
+\paragraph{Continuous reliability.} Headroom is the dominant predictor of diagnostic reliability (Spearman $\rho=0.66$, $p=0.0001$, across 30 targets). Targets with larger remaining room for improvement show stronger association between kernel change and generalization gain. Alignment alone shows no significant univariate correlation ($\rho=-0.29$, $p=0.12$). A linear regression of $\rho$ on alignment, headroom, and their interaction achieves in-sample $R^2=0.520$ (LOOCV $R^2=0.354$). The gap reflects the limited target sample (n=30). These regression results confirm that headroom carries continuous information about diagnostic reliability: higher headroom implies stronger association, in a quantifiable way.
+
+\paragraph{Reliability screening rule.} For practical use, the continuous relationship can be summarized as a binary screening rule. On the Hermite targets, headroom thresholds separate reliable from unreliable diagnostics cleanly: all targets with $\rho > 0.5$ have headroom $> 1.0$ (init R$^2$ negative) and all targets with $\rho < 0.3$ have headroom $< 0.7$. The heuristic is: if $1-R^2_{\text{init}} > 0.6$, kernel change magnitude is likely informative; if $1-R^2_{\text{init}} < 0.3$, it is likely not. This screening rule is not a substitute for held-out validation (Section~5.2), but it provides a practical pre-training check for practitioners.
+
+\begin{algorithm}
+\label{alg:reliability}
+\small
+\textbf{Reliability Screening.} \\
+\textbf{Input:} Initial features $H_0 = f_0(X_{\text{te}})$, labels $y_{\text{te}}$, initial kernel $K_0$
+
+\begin{enumerate}
+    \item \textbf{Headroom:} Fit linear probe $R^2_{\text{init}}$ on $H_0, y_{\text{te}}$. Set $\text{headroom} = 1 - R^2_{\text{init}}$.
+    \item \textbf{Effective rank:} Compute $p_{\text{eff}} = (\sum \lambda_i)^2 / \sum \lambda_i^2$ from $K_0$.
+    \item \textbf{Screen:} If $\text{headroom} > 0.6$, the diagnostic is likely informative. If $\text{headroom} < 0.3$, the diagnostic is likely unreliable. Otherwise, proceed to cross-validation (Algorithm~2).
+\end{enumerate}
+\textbf{Output:} Reliability assessment
+\end{algorithm}
+
+The thresholds above are calibration parameters, not universal constants. They are estimated from the Hermite target family. The RDEP framework separates the screening structure (which is task-independent) from the threshold values (which should be recalibrated if the target distribution differs substantially from our controlled setting).
+
+\paragraph{Two levels of prediction.} Section~5.1.1 addresses a task-level screening problem: given a new target, we predict whether kernel-change magnitude will be a reliable diagnostic. The answer is yes, and headroom alone provides a practical rule of thumb. Section~5.2 addresses a harder instance-level regression problem: using spectral information to correct an individual diagnostic. This requires estimating $v_i$ and $\Delta\lambda_i$ from finite samples, which introduces a data-reuse problem that cross-validation exposes. The two results are not contradictory. They reveal a hierarchy of difficulty. Screening is feasible, but instance-level correction faces a fundamental validation gap.
+
+\begin{algorithm}
+\label{alg:recommend}
+\small
+\textbf{Algorithm 2:} Diagnostic Recommendation. \\
+\small
+\textbf{Input:} Predicted reliability scores $\{\hat{\rho}_1, \dots, \hat{\rho}_m\}$ for diagnostics $\mathcal{D}_1, \dots, \mathcal{D}_m$, calibrated thresholds $\tau_{\text{high}}, \tau_{\text{low}}$
+
+\begin{enumerate}
+    \item Select $\mathcal{D}^* = \arg\max_i \hat{\rho}_i$.
+    \item If $\max_i \hat{\rho}_i > \tau_{\text{high}}$: recommend $\mathcal{D}^*$ with high confidence.
+    \item If $\max_i \hat{\rho}_i < \tau_{\text{low}}$: mark all diagnostics as unreliable.
+    \item Else: recommend $\mathcal{D}^*$ with caution; suggest cross-validation.
+\end{enumerate}
+\textbf{Output:} Recommended diagnostic $\mathcal{D}^*$, confidence level
+\end{algorithm}
+In our controlled experiments, calibrated thresholds are $\tau_{\text{high}} \approx 0.7$ (high-confidence region) and $\tau_{\text{low}} \approx 0.2$ (low-confidence region), estimated from the Hermite target family (Section~5.1.1). These values are implementation details, not framework requirements.  If the target distribution differs substantially from our controlled setting, the thresholds should be recalibrated.
+
+\subsection{Towards Task-Aware Kernel Diagnostics}
+
+We now turn to Level~B (instance-level correction).  While Level~A (Section~5.1.1) showed that screening for diagnostic reliability is feasible, the harder question is whether we can use spectral information to correct an individual diagnostic.  The dissociation we have documented suggests that the relevant quantity is not whether the kernel changes, but whether it changes in task-relevant directions.  A simple task-aligned projection shows this distinction. Projecting $\Delta K$ onto target-weighted eigendirections $\Delta_{\text{align}} = \sum_i v_i \cdot \Delta\lambda_i$ achieves a positive correlation with generalization improvement on the polynomial task when evaluated on the same data.  Cross-validating this measure (computing $v_i$ from 4/5 of the training data and evaluating improvement on the held-out 1/5, repeated over 5 folds and 10 seeds) yields a \emph{negative} correlation ($\rho=-0.42$, $n=50$). (A preliminary 5-seed run gave $\rho=-0.45$, $p=0.02$, $n=25$, consistent with the larger sample.)
+
+This negative result reveals a fundamental \textbf{Diagnostic Validation Gap}. Estimating task alignment on the same data yields low bias but high optimism (overfitting). Cross-validation reduces optimism but introduces variance due to finite-sample eigendecomposition instability. This is directly analogous to the bias-variance trade-off in supervised learning. Our result ($\rho=-0.42$ with 10 seeds; $\rho=-0.45$ with a preliminary 5-seed run) is not a failure; it is the first empirical demonstration of this trade-off for representation diagnostics. Closing this gap is an open methodological question.
+
+A practical alternative that avoids the validation gap is already available: the \textbf{Linear Probe Gain (LPG)}. It is defined as $\text{LPG} = R^2_{\text{post}} - R^2_{\text{init}}$, where $R^2_{\text{init}}$ and $R^2_{\text{post}}$ are linear probe coefficients of determination using initial and trained features (Supplementary Table~\ref{tab:linear_probe}). Unlike $\Delta_{\text{align}}$, the linear probe uses a separate readout trained on held-in data and evaluated on held-out data. This reduces the data reuse problem relative to spectral corrections. The double-use of labels for both projection estimation and diagnostic evaluation that plagues $\Delta_{\text{align}}$ does not arise.  However, LPG still requires cross-validated evaluation, because both initial and post-training features are evaluated on the same held-out test set (as the negative correlation below shows).  We therefore recommend LPG as a practical measure of task-relevant representation change, subject to the same validation principles (Section~5.3).
+
+We evaluate LPG under the same 5-fold cross-validation procedure (polynomial task, width~64, 10 seeds). Its Spearman correlation with held-out gain is $\rho=-0.35$ ($p=0.01$, $n=50$). For comparison, $\Delta_{\text{align}}$ under the same protocol also yields a negative correlation ($\rho=-0.42$, $n=50$, consistent with the preliminary 5-seed run of $\rho=-0.45$). We also computed the in-sample LPG correlation across the full task--width configuration grid (3 datasets $\times$ 6 widths, configuration means). It is $\rho=0.78$ ($p=0.0001$), with task-specific values of $\rho=0.77$ (poly) and $\rho=0.89$ (highfreq). LPG is less severely affected by the validation gap than spectral corrections, but it is not a panacea. Both diagnostics suffer from the same fundamental limitation under finite samples and flat spectra. That LPG and $\Delta_{\text{align}}$ both yield negative cross-validated correlations is evidence for an irreducible gap, not a failure of either diagnostic individually. Proposition~\ref{prop:gap} attributes this gap to finite-sample estimation variance. The practical implication is that no existing diagnostic can be trusted without held-out validation. This meta-level conclusion applies equally to our own proposed measure. Figure~\ref{fig:rdep} (Step~5) formalizes an adaptive selection rule that chooses between diagnostics based on the effective rank of $K_0$.
+
+\vspace{4pt}
+\subsection{Principles for Diagnostic Evaluation}\label{sec:principles}
+\vspace{2pt}
+
+\subsubsection{RDEP in Practice: Preventing Diagnostic Misjudgments}
+
+To illustrate how RDEP changes practical conclusions, Table~\ref{tab:rdeep_cases} walks through three representative configurations. It compares the interpretation a practitioner would draw without RDEP (relying on CKA or Frobenius alone) versus with RDEP (following the full workflow).
+
+\begin{table}[t]
+\centering\small
+\caption{RDEP prevents three common diagnostic misjudgments.  For each configuration, the naive interpretation (based on CKA or $\Delta K$ alone) is contradicted by the RDEP workflow, which combines multiple metrics and width-controlled analysis.}
+\label{tab:rdeep_cases}
+\begin{tabular}{p{2cm}p{2.2cm}p{2.2cm}p{2.2cm}p{2.2cm}}
+\toprule
+Config. & Naive reading (CKA/$\Delta K$) & RDEP Step 1 (CKA) & RDEP Step 2 ($\Delta K$) & RDEP Step 3--4 (spectral + alignment) \\
+\midrule
+Poly w=32 & CKA=0.92, $\Delta K=25\%$ $\rightarrow$ moderate change, moderate learning? & CKA $\gg 0.99$? No. Cannot conclude ``no learning'' & $\Delta K >10\%$. Cannot conclude ``useful adaptation'' & $\rho=0.14$ (near-zero). Spectral alignment is weak. Correct conclusion: kernel change does not predict gain. \\
+\midrule
+Highfreq w=32 & $\Delta K=103\%$ $\rightarrow$ large change = useful learning? & CKA=0.85 $<0.99$. No false stability claim & $\Delta K >10\%$. Do not conclude adaptation & $\rho=0.94$ raw, but collapses to $\rho=0.10$ after width control. The apparent association is a width artifact. \\
+\midrule
+GMM w=128 & CKA=0.99, $\Delta K=53\%$ $\rightarrow$ contradiction? & CKA $\approx 0.99$. Check further & $\Delta K >10\%$. Do not conclude adaptation & $\rho=1.0$ even after width control ($\rho=0.91$). Alignment is genuine. Conclusion: for well-aligned tasks, $\Delta K$ \emph{can} be informative. \\
+\bottomrule
+\multicolumn{5}{p{10.6cm}}{\small\textit{Note:} The ``10\%'' threshold in Step~2 is illustrative, based on the observed Frobenius change range; the actual decision rule uses the Spearman correlation (Steps~3--4), not a fixed $\Delta K$ cutoff.}
+\end{tabular}
+\end{table}
+
+Our findings translate into three principles (paralleling the reliability regimes of Section~4):
+(i) \textbf{Global similarity does not imply sufficiency.} High CKA does not imply absence of spectral reorganization.
+(ii) \textbf{Kernel magnitude does not imply task relevance.} Frobenius change conflates task-aligned and task-orthogonal movement.
+(iii) \textbf{Task alignment must be validated.} Any diagnostic using the same data to estimate alignment and improvement risks overfitting (Section~5.2).
+
+\begin{figure}[t]
+\caption{RDEP Validation Protocol}
+\label{fig:rdep}
+\centering
+\fbox{\begin{minipage}{0.92\textwidth}
+\small
+\textbf{Input:} Model family $\mathcal{F}$, task distribution $\mathcal{T}$, candidate diagnostic $\mathcal{D}$, significance level $\alpha$, number of widths $W$, number of seeds $S$ \\
+\textbf{Output:} Reliability map $\mathcal{R}$ indicating regimes where $\mathcal{D}$ is informative about generalization
+
+\begin{enumerate}
+    \item \textbf{Calibration sweep.}
+    For each task $f \in \mathcal{T}$, each width $w \in \{w_1, \dots, w_W\}$, and each seed $s \in \{1, \dots, S\}$:
+    \begin{enumerate}
+        \item Train model $M_{w,s} \in \mathcal{F}$ on $n$ samples from $f$.
+        \item Compute initial and final kernels $K_0, K_T$, diagnostic $d_{w,s} = \mathcal{D}(K_0, K_T)$, and generalization improvement $\Delta e_{w,s}$.
+    \end{enumerate}
+    Construct calibration table $\mathcal{C} = \{\bar{d}_w, \overline{\Delta e}_w\}_{w=1}^W$ where $\bar{d}_w, \overline{\Delta e}_w$ are means over seeds.
+
+    \item \textbf{Width-controlled analysis.}
+    Compute partial Spearman correlation $\rho(\mathcal{D}, \Delta\mathcal{E} \mid \text{width})$ controlling for the width-driven trend.  If $|\rho_{\text{partial}}| < \alpha$, flag the association as a potential width artifact.
+
+    \item \textbf{Spectral inspection.}
+    Decompose $K_0 = \sum_i \lambda_i \phi_i \phi_i^\top$ and compute target projections $v_i = \langle \phi_i, y \rangle^2 / n$.  Report spectral concentration $c_k = \sum_{i=1}^k v_i / \sum_{i=1}^n v_i$ for $k \in \{3, 5, 10\}$.
+
+    \item \textbf{Held-out validation.}
+    If $\mathcal{D}$ incorporates estimated target projections $\hat{v}_i$, perform $K$-fold cross-validation:
+    \begin{enumerate}
+        \item For each fold, estimate $\hat{v}_i^{(\text{train})}$ on 4/5 of data, measure $\Delta\mathcal{E}$ on held-out 1/5.
+        \item Compute $\rho_{\text{cv}}$ across all folds.  Report both in-sample and cross-validated correlations.
+        \item If $\rho_{\text{cv}} \leq 0$ while $\rho_{\text{in}} > 0$, conclude that the diagnostic suffers from data-reuse overfitting (Diagnostic Validation Gap, Proposition~\ref{prop:gap}) and is not reliable without held-out validation.
+    \end{enumerate}
+    \item \textbf{Adaptive diagnostic selection.}
+    Compute effective rank $p_{\text{eff}} = (\sum \lambda_i)^2 / \sum \lambda_i^2$ of $K_0$ and credibility score $\kappa = p_{\text{eff}} / n$:
+    \begin{enumerate}
+        \item If $\kappa < 0.3$ (concentrated spectrum): spectral diagnostics $\mathcal{D}_{\text{align}}$ are reliable; proceed with Step~4.
+        \item If $\kappa > 0.7$ (flat spectrum): spectral diagnostics are dominated by estimation variance; fall back to LPG (Linear Probe Gain) as a more stable alternative.
+        \item If $0.3 \leq \kappa \leq 0.7$: report both diagnostics and mark the regime as ambiguous.
+    \end{enumerate}
+\end{enumerate}
+\end{minipage}}
+\end{figure}
+
+These principles translate directly into the RDEP protocol (Figure~\ref{fig:rdep}), which operationalizes each principle as a concrete step.
+
+\subsection{Limitations}
+This work studies \emph{diagnostic validity}. That is, we ask whether observable kernel evolution provides a reliable signal about generalization, rather than studying causal mechanisms.  We do not claim that kernels are irrelevant to generalization. NTK theory remains valuable in its intended regime, and similarity metrics capture aspects of representation geometry.  Our contribution is bounding the reliability of these metrics as diagnostics.
+
+Specific limitations:
+\begin{itemize}
+    \item \textbf{Architecture scope.}  Our main experiments use two-layer MLPs for tractability and direct connection to NTK theory.  Section~4.4 extends the analysis to CNNs, Vision Transformers, NLP Transformers, and ResNets, confirming that the dissociation is not an artifact of two-layer architectures.  However, the CIFAR-100 results reveal a different scaling regime (wider networks learn more despite lower headroom), suggesting that the headroom framework's predictions are task-dependent in ways not yet fully characterized.  Larger-scale architectures (e.g., ResNet-50 on ImageNet, LLMs) remain open challenges.  While the headroom framework's consistency across five distinct architectures suggests general validity, this is not yet proven at scale.
+    \item \textbf{Feature kernel, not NTK.}  Whether analogous results hold for Jacobian-based kernels is open.
+    \item \textbf{Standard parameterization confirmed in NTK param.}  We verified the dissociation on the polynomial task under NTK parameterization (init variance $1/d$) across 6 widths and 10 seeds. Frobenius change decays monotonically from $108\%$ (width~32) to $6\%$ (width~1024), but $\Delta$Error shows no reliable improvement at any width except width~32 ($\Delta$Error $=0.83\pm0.44$), where large kernel change coincides with large improvement. At widths $\ge 64$, $\Delta$Error is consistently negative (performance degrades after training) despite continued kernel reorganization. The config-mean Spearman correlation is $\rho=0.43$ ($p=0.40$), confirming that the dissociation is not an artifact of parameterization choice.
+    \item \textbf{Highfreq results are seed-dependent, not a capacity artifact.}  With 10 seeds at width~32, the highfreq target shows mean gain $0.190\pm0.130$. Kernel evolution at small widths does capture \emph{some} task-relevant information on average, but the standard deviation means individual seeds range from near-zero to substantial improvement.  The original single-seed result (gain$\approx0$) was not representative.  A controlled comparison with the low-frequency target $\sin(x_1)+\cos(x_2)$ at the same width shows \emph{negative} gain ($-0.037\pm0.042$). This confirms that target structure, not network capacity, determines whether kernel evolution helps or hurts.
+    \item \textbf{Synthetic data.}  Real-world tasks may present additional structure.
+    \item \textbf{Hermite regression sample size.}  The headroom-alignment regression in Section~5.1.1 is based on 30 Hermite target functions with 10 seeds each, but the leave-one-out CV estimate ($R^2=0.354$) still shows meaningful shrinkage relative to the in-sample $R^2=0.520$, suggesting the target dimensionality is not yet saturated.  A larger target family would provide a tighter bound on held-out predictive accuracy.
+    \item \textbf{RDEP scope.}  The RDEP framework requires spectral decompositions, which become computationally expensive for very large models (e.g., Transformers with hundreds of millions of parameters).  Our analysis focuses on feature kernels from two-layer MLPs and small CNNs, with extensions to small Vision Transformers and NLP Transformers (Section~4.4).  The positive SST-2 result ($\rho=0.90$) provides cross-modal evidence that the headroom framework generalizes beyond vision, but the calibration patterns for large-scale attention architectures or Jacobian-based (NTK) kernels remain open.  Extending to large-scale Transformers and LLMs is computationally prohibitive but conceptually straightforward; we leave this to future work.
+    \item \textbf{Pre-trained model seed sensitivity.}  The ViT-B/16 fine-tuning results show a Frobenius change of $47.0\pm26.3\%$ (coefficient of variation $>50\%$), indicating that pre-trained model diagnostics may be less stable than those from random initialization.  This could reflect sensitivity to stochasticity in fine-tuning dynamics when headroom is low.  Our current sample (3--4 seeds per architecture) is too small to characterize this variability precisely, and we caution that pre-trained model diagnostics may require more seeds for reliable calibration.
+\end{itemize}
+
+\subsection{Looking Forward}\label{sec:future}
+
+The framework extends beyond feature-kernel evolution. Any label-invariant metric (CKA, SVCCA, PWCCA, RSA, CCA) is subject to the same bound (Proposition~\ref{prop:gap}). When spectral decompositions are expensive, we recommend LPG as a practical alternative (Section~5.2). We define \textbf{DiaBench}, a benchmark built from the Hermite family (Section~5.1.1) and the three calibration regimes (Section~4.1--4.3). Source code: \url{https://github.com/wyp629929/When-to-Trust-Kernel-Change-}. Future work should treat representation diagnostics as predictive tools requiring held-out validation.
+
+% ============================================================
+
+\bibliography{refs}
+
+
+% ============================================================
+\appendix
+\setcounter{figure}{0}
+\setcounter{table}{0}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+
+\section{Proof of Proposition~\ref{prop:gap} (Upper Bound)}
+\label{app:proof}
+
+We derive upper bounds on the in-sample bias and cross-validation variance of the Spearman correlation between a task-aligned diagnostic $\mathcal{D}_{\text{align}} = \sum_i \hat{v}_i \Delta\lambda_i$ and the generalization improvement $\Delta\mathcal{E}$.  These results establish the Diagnostic Validation Gap as a finite-sample phenomenon.
+
+\subsection{In-sample bias}
+
+Let $\epsilon_i = \hat{v}_i - v_i^*$ be the estimation error and write $\mathcal{D}_{\text{align}} = \mathcal{D}^* + \delta$, where $\mathcal{D}^* = \sum_i v_i^* \Delta\lambda_i$ is the oracle diagnostic and $\delta = \sum_i \epsilon_i \Delta\lambda_i$ is the perturbation.  The Spearman correlation is a rank statistic; we bound its expectation via the difference between the sample and oracle Pearson correlations on the ranks.  Let $\tilde{\mathcal{D}}$ and $\widetilde{\Delta\mathcal{E}}$ denote the rank-transformed versions of $\mathcal{D}_{\text{align}}$ and $\Delta\mathcal{E}$.
+
+The sample Pearson correlation on ranks is
+\[
+\rho_{\text{in}} = \frac{\operatorname{Cov}(\widetilde{\Delta\mathcal{E}}, \tilde{\mathcal{D}}^*) + \operatorname{Cov}(\widetilde{\Delta\mathcal{E}}, \tilde{\delta})}
+{\sqrt{\operatorname{Var}(\widetilde{\Delta\mathcal{E}})\bigl[\operatorname{Var}(\tilde{\mathcal{D}}^*) + 2\operatorname{Cov}(\tilde{\mathcal{D}}^*, \tilde{\delta}) + \operatorname{Var}(\tilde{\delta})\bigr]}}.
+\]
+
+Let $\rho^*$ be the oracle correlation (with $\delta = 0$).  By the triangle inequality,
+\[
+|\rho_{\text{in}} - \rho^*| \leq \frac{|\operatorname{Cov}(\widetilde{\Delta\mathcal{E}}, \tilde{\delta})|}
+{\sqrt{\operatorname{Var}(\widetilde{\Delta\mathcal{E}})\operatorname{Var}(\tilde{\mathcal{D}}^*)}} + \mathcal{O}\bigl(\operatorname{Var}(\tilde{\delta})\bigr),
+\]
+where the second term bounds the denominator perturbation via the inequality $|1/\sqrt{a + h} - 1/\sqrt{a}| \leq |h|/(2a^{3/2})$ for $a > 0$ and small $h$.
+
+By the Cauchy--Schwarz inequality,
+\[
+|\operatorname{Cov}(\widetilde{\Delta\mathcal{E}}, \tilde{\delta})| \leq \sqrt{\operatorname{Var}(\widetilde{\Delta\mathcal{E}})\operatorname{Var}(\tilde{\delta})}.
+\]
+
+Since $\tilde{\delta}$ is the rank-transformed version of $\delta = \sum_i \epsilon_i \Delta\lambda_i$, and rank-transformation is a non-expansive map in the sense that $\|\tilde{\delta}\|_\infty \leq \|\delta\|_\infty$ and $\|\tilde{\delta}\|_2 \leq \|\delta\|_2$ for i.i.d.\ samples (the ranks are a permutation of $\{1,\dots,n\}$, so their variance depends only on $n$ and not on the distribution of $\delta$; see \citet{kendall1979rank}, Chapter~3), we have $\operatorname{Var}(\tilde{\delta}) \leq \operatorname{Var}(\delta)$.  Using Assumption~\ref{assum:spec} ($|\Delta\lambda_i| \leq C\lambda_i$),
+\[
+\operatorname{Var}(\delta) \leq \sum_{i,j} |\operatorname{Cov}(\epsilon_i, \epsilon_j)| \cdot C^2 \lambda_i \lambda_j.
+\]
+
+Under Assumption~\ref{assum:proj} (sub-Gaussian), each $\epsilon_i$ has variance $\mathcal{O}(1/n)$.  By the Gershgorin circle theorem, $\sum_{i,j} |\operatorname{Cov}(\epsilon_i, \epsilon_j)| \leq p_{\text{eff}} \cdot \max_i \sum_j |\operatorname{Cov}(\epsilon_i, \epsilon_j)| \leq C_1 \cdot p_{\text{eff}} / n$.
+\[
+\operatorname{Var}(\delta) \leq C^2 \max_i \lambda_i^2 \cdot \sum_{i,j} |\operatorname{Cov}(\epsilon_i, \epsilon_j)|
+\leq C_2 \cdot \frac{p_{\text{eff}}}{n} \cdot \max_i \lambda_i^2.
+\]
+
+Since the feature kernel is a Gram matrix on bounded data ($\|x\|_2 \leq \sqrt{d}$ with $d=10$), its eigenvalues are bounded by $\max_i \lambda_i \leq \operatorname{Tr}(K_0) = n$, giving $\max_i \lambda_i^2 \leq n^2$.  Thus $\operatorname{Var}(\delta) \leq C_2 \cdot p_{\text{eff}} \cdot n$.
+
+The bound on $|\mathbb{E}[\rho_{\text{in}}] - \rho^*|$ involves rank-transformed variables $\tilde{\mathcal{D}}^*$ and $\tilde{\delta}$.  For a rank statistic on $n$ observations, the variance scales as $\Theta(n^2)$: specifically, $\operatorname{Var}(\tilde{\mathcal{D}}^*) \geq c_1 n^2$ and $\operatorname{Var}(\tilde{\delta}) \leq c_2 \cdot p_{\text{eff}} \cdot n$ (from the bound on $\operatorname{Var}(\delta)$ above, since rank-transformation is 1-Lipschitz).  Hence the ratio $\operatorname{Var}(\tilde{\delta}) / \operatorname{Var}(\tilde{\mathcal{D}}^*) \leq C \cdot p_{\text{eff}} / n$, giving
+\[
+|\mathbb{E}[\rho_{\text{in}}] - \rho^*| \leq C_3 \cdot \sqrt{\frac{p_{\text{eff}}}{n}} + \mathcal{O}\!\left(\frac{p_{\text{eff}}}{n}\right) = \mathcal{O}\bigl(\|\hat{v} - v^*\|_1\bigr),
+\]
+where the final equality uses $\|\hat{v} - v^*\|_1 \geq \sqrt{p_{\text{eff}} / n}$ under the sub-Gaussian assumption.
+
+\subsection{Cross-validation variance (upper bound)}
+
+Under $K$-fold cross-validation, fold $k$ estimates $\hat{v}_i^{(k)}$ from $n/K$ training samples and evaluates $\Delta\mathcal{E}^{(k)}$ on $n/K$ held-out samples.  Let $\rho^{(k)}$ be the Spearman correlation within fold $k$, computed from $\mathcal{D}_{\text{align}}^{(k)} = \sum_i \hat{v}_i^{(k)} \Delta\lambda_i^{(k)}$.  Folds are independent, so
+\[
+\operatorname{Var}(\rho_{\text{cv}}) = \frac{1}{K^2} \sum_{k=1}^K \operatorname{Var}(\rho^{(k)}).
+\]
+
+For a Spearman correlation computed from $m = n/K$ observations, the variance is bounded by $1/(m-1)$ under the null~\citep{kendall1979rank}.  With estimation error in $\hat{v}_i^{(k)}$, the effective noise level increases.  We bound $\operatorname{Var}(\rho^{(k)})$ using the fact that Spearman correlation is a special case of Pearson correlation on ranks, with variance bounded by
+\[
+\operatorname{Var}(\rho^{(k)}) \leq \frac{1 + c \cdot \operatorname{Var}(\mathcal{D}_{\text{align}}^{(k)})}{m - 1},
+\]
+where $c$ is a constant depending on the signal-to-noise ratio of $\Delta\mathcal{E}^{(k)}$.
+
+To bound $\operatorname{Var}(\mathcal{D}_{\text{align}}^{(k)})$, write $\epsilon_i^{(k)} = \hat{v}_i^{(k)} - v_i^*$.  Under Assumptions~\ref{assum:proj}--\ref{assum:spec},
+\[
+\operatorname{Var}\bigl(\mathcal{D}_{\text{align}}^{(k)}\bigr) \leq \sum_{i,j} \bigl|\operatorname{Cov}(\epsilon_i^{(k)}, \epsilon_j^{(k)})\bigr| \cdot |\Delta\lambda_i^{(k)}\Delta\lambda_j^{(k)}|
+\leq C^2 \max_i \lambda_i^2 \cdot \sum_{i,j} \bigl|\operatorname{Cov}(\epsilon_i^{(k)}, \epsilon_j^{(k)})\bigr|.
+\]
+
+The covariance sum $\sum_{i,j} |\operatorname{Cov}(\epsilon_i^{(k)}, \epsilon_j^{(k)})|$ is bounded by $p_{\text{eff}} \cdot \mathcal{O}(K/n)$, because each $\epsilon_i^{(k)}$ has variance $\mathcal{O}(K/n)$ (sub-Gaussian with $n/K$ samples) and the effective rank $p_{\text{eff}}$ bounds the number of eigendirections with non-negligible spectral mass.  This gives
+\[
+\operatorname{Var}\bigl(\mathcal{D}_{\text{align}}^{(k)}\bigr) \leq C_4 \cdot \frac{p_{\text{eff}} K}{n}.
+\]
+
+Substituting into the bound for $\operatorname{Var}(\rho^{(k)})$ and summing over $K$ folds,
+\[
+\operatorname{Var}(\rho_{\text{cv}}) \leq \frac{1}{n} + C_5 \cdot \frac{p_{\text{eff}}}{n} = \mathcal{O}\!\left(\frac{p_{\text{eff}}}{n}\right).
+\]
+
+\subsection{Interpretation}
+
+The upper bound $\operatorname{Var}(\rho_{\text{cv}}) \leq \mathcal{O}(p_{\text{eff}} / n)$ shows that when $p_{\text{eff}} \ll n$, the cross-validated estimate is stable (variance dominated by the $1/n$ term).  When $p_{\text{eff}} \sim n$, the bound allows variance of order $\mathcal{O}(1)$, meaning the estimate can be unreliable, consistent with our experimental observation that $\rho_{\text{cv}}$ flips sign at large widths.  We caution that this is an upper bound, not a matching lower bound. A tight lower bound would require additional assumptions about the spectral distribution (e.g., a Marcenko-Pastur-type law for the eigenvalue spectrum) and is left to future work.  The empirical scaling in our experiments confirms the qualitative prediction of the bound.
+
+\section{Supplementary Figures}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/figS1.png}
+    \caption{Spectral redistribution. For each dataset at width 128, top panels show eigenvalue ratio $\lambda_{\text{post}}/\lambda_{\text{init}}$ per eigen-direction; bottom panels show target projections $v_{i}$ before and after training. GMM exhibits substantial reorganization in both quantities despite high CKA.}
+    \label{fig:spec_redist}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/mnist_scatter.png}
+    \caption{MNIST dissociation. Kernel change versus generalization improvement for MNIST binary classification (0 vs.\ 1).  The association is strong (Spearman $\rho=0.89$, $p=0.019$), indicating that on real data kernel change carries more predictive signal than on synthetic tasks.}
+    \label{fig:mnist_scatter}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.75\textwidth]{figures/fig_epoch_dynamics.png}
+    \caption{Epoch dynamics for polynomial target at width~32 (single seed).  CKA between initial and current features (blue, left axis) stabilizes within $\sim$50 epochs, while cumulative generalization improvement $-\Delta$Error (orange, right axis) continues to evolve over the full 500 epochs.  The temporal decoupling shows that early kernel stabilization does not imply that learning has converged.  Across 10 seeds, the mean improvement at width~32 is $0.003\pm0.049$, so the trajectory shown illustrates the mechanism rather than a representative effect size.}
+    \label{fig:epoch_dynamics}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/figS5.png}
+    \caption{CNN eigenvalue spectrum evolution on CIFAR-10 before (blue) and after (orange) training, for channel widths $W=16$ (left) and $W=128$ (right).  At $W=128$, the top eigenvalues increase substantially after training while the rank order is preserved, confirming that spectral reorganization persists even when CKA is high ($0.991$).}
+    \label{fig:cnn_spectrum}
+\end{figure}
+
+\begin{table}[ht]
+    \centering\footnotesize
+        \caption{CIFAR-10 CNN results (5 seeds per width).  Values are means $\pm$ s.d.  The linear probe $\Delta R^2$ is numerically largest at $W=32$ ($+0.519\pm0.306$, comparable to $W=64$ at $+0.509\pm0.321$ within one standard deviation) while Frobenius change shows a non-monotonic pattern.}
+    \label{tab:cnn_cifar}
+    \begin{tabular}{lccc}
+    \toprule
+    Width & CKA & $\Delta K$ (\%) & $\Delta R^2$ \\
+    \midrule
+    16  & $0.919\pm0.039$ & $55.1\pm9.8$  & $+0.400\pm0.246$ \\
+    32  & $0.947\pm0.024$ & $62.5\pm19.4$ & $+0.519\pm0.306$ \\
+    64  & $0.962\pm0.027$ & $65.9\pm20.5$ & $+0.509\pm0.321$ \\
+    128 & $0.991\pm0.007$ & $43.4\pm11.9$ & $+0.149\pm0.125$ \\
+    256 & $0.989\pm0.009$ & $51.3\pm16.9$ & $+0.266\pm0.217$ \\
+    \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[ht]
+    \centering
+    \caption{MNIST binary classification (0 vs.\ 1).  Width-dependent kernel stability shows a non-monotonic pattern: CKA rises from 0.768 to 0.963 as width increases from 32 to 256, then \emph{declines} at width 1024 ($0.867\pm0.024$, consistent across all 5 seeds).  The Frobenius change similarly increases at width 1024 ($81.5\pm9.3\%$), suggesting that on high-dimensional inputs (784D) very wide networks enter a distinct optimization regime where the kernel continues to reorganize substantially.  The cause of this reversal is not yet established but appears robust across seeds.  Despite these variations, the config-mean Spearman correlation between $\Delta K$ and improvement is $\rho=0.89$ ($p=0.019$\textsuperscript{*}; see Supplementary Figure~\ref{fig:mnist_scatter}), confirming that the aggregate width-driven trend is strong on MNIST.  (\textsuperscript{*}Uncorrected $p$-value; see Section~3.5 for BH-adjusted thresholds.)}
+    \label{tab:mnist}
+    \begin{tabular}{lccc}
+    \toprule
+    Width & CKA & $\Delta K$ (\%) \\
+    \midrule
+    32   & $0.768\pm0.090$ & $237.4\pm129.8$ \\
+    64   & $0.877\pm0.030$ & $71.7\pm33.5$   \\
+    128  & $0.917\pm0.026$ & $39.1\pm7.0$    \\
+    256  & $0.963\pm0.011$ & $50.3\pm10.7$   \\
+    512  & $0.963\pm0.028$ & $51.8\pm16.5$   \\
+    1024 & $0.867\pm0.024$ & $81.5\pm9.3$    \\
+    \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering\footnotesize
+        \caption{Linear probe R$^2$ on frozen features (mean over 5 seeds).  Poly features improve most when kernel change is large.  Highfreq features degrade after training despite $>90\%$ kernel change.  Note: R$^2$ can be negative when the linear predictor performs worse than the constant mean predictor.}
+    \label{tab:linear_probe}
+    \begin{tabular}{lcccc}
+    \toprule
+    Dataset & Width & Init R$^2$ & Post R$^2$ & $\Delta$R$^2$ \\
+    \midrule
+    poly & 32  & $0.682$ & $0.961$ & $+0.279$ \\
+    poly & 64  & $0.870$ & $0.963$ & $+0.093$ \\
+    poly & 128 & $0.953$ & $0.970$ & $+0.017$ \\
+    poly & 256 & $0.969$ & $0.975$ & $+0.006$ \\
+    poly & 512 & $0.984$ & $0.985$ & $+0.001$ \\
+    poly & 1024 & $0.987$ & $0.988$ & $+0.000$ \\
+    \midrule
+    highfreq & 32  & $-0.126$ & $-0.867$ & $-0.741$ \\
+    highfreq & 64  & $-0.056$ & $-0.611$ & $-0.555$ \\
+    highfreq & 128 & $-0.284$ & $-0.632$ & $-0.348$ \\
+    highfreq & 256 & $-0.321$ & $-0.518$ & $-0.197$ \\
+    highfreq & 512 & $-0.547$ & $-0.536$ & $+0.011$ \\
+    highfreq & 1024 & $-0.515$ & $-0.468$ & $+0.047$ \\
+    \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[h!]  % force immediate placement
+    \centering\footnotesize
+        \caption{FashionMNIST binary classification.  The Spearman correlation between kernel change and generalization improvement is \emph{negative} (Spearman $\rho=-0.43$, $p=0.017$).  See Section~4.4 for discussion.}
+    \label{tab:fashion}
+    \begin{tabular}{lccc}
+    \toprule
+    Width & CKA & $\Delta K$ (\%) & $\Delta$Error \\
+    \midrule
+    32   & $0.510\pm0.042$ & $67.0\pm5.2$  & $+8.670$ \\
+    64   & $0.587\pm0.038$ & $77.2\pm4.1$  & $+1.355$ \\
+    128  & $0.667\pm0.031$ & $84.7\pm3.8$  & $-0.032$ \\
+    256  & $0.725\pm0.028$ & $91.6\pm2.9$  & $+0.010$ \\
+    512  & $0.763\pm0.025$ & $94.2\pm3.1$  & $+0.108$ \\
+    1024 & $0.747\pm0.030$ & $97.3\pm2.6$  & $+0.115$ \\
+    \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[h!]  % force immediate placement
+    \centering\footnotesize
+        \caption{Random-label baseline (poly target, shuffled labels).  Kernel change remains substantial at small widths despite the absence of any signal, demonstrating that large Frobenius change alone cannot distinguish signal-driven adaptation from noise.  Results are means over 5 seeds.}
+    \label{tab:random_label}
+    \begin{tabular}{lccc}
+    \toprule
+    Width & CKA & $\Delta K$ (\%) & $\Delta$Error \\
+    \midrule
+    32   & $0.851\pm0.016$ & $103.0\pm7.3$   & $+0.111$ \\
+    64   & $0.944\pm0.014$ & $49.2\pm3.1$    & $+0.028$ \\
+    128  & $0.984\pm0.002$ & $21.2\pm1.6$    & $-0.003$ \\
+    256  & $0.997\pm0.000$ & $6.8\pm1.9$     & $+0.004$ \\
+    512  & $1.000\pm0.000$ & $2.1\pm0.3$     & $+0.001$ \\
+    1024 & $1.000\pm0.000$ & $1.0\pm0.2$     & $+0.000$ \\
+    \bottomrule
+    \end{tabular}
+\end{table}
+
+\end{document}
