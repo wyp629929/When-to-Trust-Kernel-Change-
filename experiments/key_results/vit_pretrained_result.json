@@ -1,0 +1,15 @@
+{
+  "arch": "vit_b_16",
+  "seed": 0,
+  "shuffled": false,
+  "lr": 1e-05,
+  "cka": 0.752,
+  "frob": 51.1,
+  "delta_err": -2.7e-05,
+  "init_r2": 0.9985,
+  "post_r2": 0.9958,
+  "headroom": 0.00148,
+  "lpg": -0.00276,
+  "p_eff_0": 23.8,
+  "v_top3_0": 0.925
+}
