@@ -348,13 +348,13 @@ def plot_results():
     ax.legend()
 
     plt.tight_layout()
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/exp1_v2.png', dpi=150)
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/exp1_v2.pdf')
+    plt.savefig('./figures/exp1_v2.png', dpi=150)
+    plt.savefig('./figures/exp1_v2.pdf')
     print(f"\nFigure saved.")
     plt.show()
 
 
 if __name__ == '__main__':
     import os
-    os.makedirs('/Users/wangyaoping/Desktop/ml_paper/figures', exist_ok=True)
+    os.makedirs('./figures', exist_ok=True)
     plot_results()

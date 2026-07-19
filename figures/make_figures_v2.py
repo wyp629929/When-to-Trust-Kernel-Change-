@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import spearmanr, linregress
 import os
 
-OUTPUT = '/Users/wangyaoping/Desktop/ml_paper/figures'
+OUTPUT = './figures'
 
 with open(f'{OUTPUT}/seed_results.json') as f:
     D = json.load(f)

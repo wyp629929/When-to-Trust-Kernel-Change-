@@ -230,8 +230,8 @@ for row, dn in enumerate(DATASETS):
     ax.set_xticklabels([str(w) for w in WIDTHS])
 
 plt.tight_layout()
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/width_sweep.png', dpi=150)
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/width_sweep.pdf')
+plt.savefig('./figures/width_sweep.png', dpi=150)
+plt.savefig('./figures/width_sweep.pdf')
 print(f"\nFigure saved.", flush=True)
 
 # ---- 打印汇总表 ----

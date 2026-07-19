@@ -304,13 +304,13 @@ def run_all():
     ax.set_title('(f) Spectrum Visualization')
 
     plt.tight_layout()
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/exp_final.png', dpi=150)
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/exp_final.pdf')
+    plt.savefig('./figures/exp_final.png', dpi=150)
+    plt.savefig('./figures/exp_final.pdf')
     print(f"\nFigure saved.")
     plt.show()
 
 
 if __name__ == '__main__':
     import os
-    os.makedirs('/Users/wangyaoping/Desktop/ml_paper/figures', exist_ok=True)
+    os.makedirs('./figures', exist_ok=True)
     run_all()

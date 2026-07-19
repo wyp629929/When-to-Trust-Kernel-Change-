@@ -90,7 +90,7 @@ if __name__ == '__main__':
                 print(f"[{done}/{total}] k={k} w={w} seed={s}: "
                       f"CKA={r['cka']:.4f} gain={r['delta_err']:.4f} {elapsed:.0f}s")
 
-    out = '/Users/wangyaoping/Desktop/ml_paper/figures/freq_sweep_results.json'
+    out = './figures/freq_sweep_results.json'
     with open(out, 'w') as f:
         json.dump(all_results, f)
     print(f"\n{total} runs complete. Saved to {out}  [{time.time()-t0:.0f}s]")

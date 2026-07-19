@@ -125,7 +125,7 @@ if __name__ == '__main__':
             for r in rs:
                 print(f"[{param}] w={r['width']} seed={s}: CKA={r['cka']:.4f} Frob={r['frob']:.1f}% Gain={r['gain']:.4f}")
 
-    out = '/Users/wangyaoping/Desktop/ml_paper/figures/mup_results.json'
+    out = './figures/mup_results.json'
     with open(out, 'w') as f:
         json.dump(all_results, f)
 

@@ -1,7 +1,7 @@
 """
 ResNet-18 on CIFAR-10 binary: full RDEP calibration for medium-scale vision.
 4 channel widths x 5 seeds + null baseline + spectral analysis + headroom.
-10 parallel workers. Directly addresses JMLR 雷区二.
+10 parallel workers. architecture test.
 """
 import numpy as np, torch, torch.nn as nn, torch.optim as optim, json, time, os, warnings
 from torchvision import datasets, transforms

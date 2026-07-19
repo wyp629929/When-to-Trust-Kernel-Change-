@@ -4,7 +4,7 @@ import json, numpy as np, matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-d = json.load(open('/Users/wangyaoping/Desktop/ml_paper/figures/cnn_spectrum_results.json'))
+d = json.load(open('./figures/cnn_spectrum_results.json'))
 
 fig, axes = plt.subplots(1, 2, figsize=(8, 4))
 
@@ -23,7 +23,7 @@ for ax, entry in zip(axes, d):
     ax.grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/fig_cnn_spectrum.png', dpi=200, bbox_inches='tight')
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/fig_cnn_spectrum.pdf', bbox_inches='tight')
+plt.savefig('./figures/fig_cnn_spectrum.png', dpi=200, bbox_inches='tight')
+plt.savefig('./figures/fig_cnn_spectrum.pdf', bbox_inches='tight')
 plt.close()
 print("CNN spectrum figure saved.")

@@ -241,13 +241,13 @@ def plot_all():
     ax.legend()
 
     plt.tight_layout()
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/spectral_analysis.png', dpi=150)
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/spectral_analysis.pdf')
+    plt.savefig('./figures/spectral_analysis.png', dpi=150)
+    plt.savefig('./figures/spectral_analysis.pdf')
     print(f"\nSaved.")
     plt.close('all')
     print("Done.", flush=True)
 
 
 if __name__ == '__main__':
-    os.makedirs('/Users/wangyaoping/Desktop/ml_paper/figures', exist_ok=True)
+    os.makedirs('./figures', exist_ok=True)
     plot_all()

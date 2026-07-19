@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import spearmanr, linregress
 warnings.filterwarnings('ignore')
 
-FIGDIR = '/Users/wangyaoping/Desktop/ml_paper/figures'
-OUTDIR = '/Users/wangyaoping/Desktop/ml_paper/jmlr_paper/figures'
+FIGDIR = './figures'
+OUTDIR = './jmlr_paper/figures'
 os.makedirs(FIGDIR, exist_ok=True)
 
 CMAP = {'poly': '#4C72B0', 'highfreq': '#DD8452', 'gmm': '#55A868'}

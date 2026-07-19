@@ -69,7 +69,7 @@ for w in WIDTHS:
         print(f"  width {w} seed {s}: frob={r['frob']:.1f}%, delta_err={r['delta_err']:.4f}, cka={r['cka']:.4f}")
 
 # Save
-with open('/Users/wangyaoping/Desktop/ml_paper/figures/random_label_results.json', 'w') as f:
+with open('./figures/random_label_results.json', 'w') as f:
     json.dump(results, f)
 
 # Summary

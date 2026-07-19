@@ -4,7 +4,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 
-d = json.load(open('/Users/wangyaoping/Desktop/ml_paper/figures/cnn_cifar_results.json'))
+d = json.load(open('./figures/cnn_cifar_results.json'))
 CMAP = {16: '#4C72B0', 32: '#DD8452', 64: '#55A868', 128: '#C44E52', 256: '#937860'}
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
@@ -31,7 +31,7 @@ for ax, xkey, xlabel, title in [
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
 plt.tight_layout()
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/figS6_cnn_cifar.png', dpi=200, bbox_inches='tight')
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/figS6_cnn_cifar.pdf', bbox_inches='tight')
+plt.savefig('./figures/figS6_cnn_cifar.png', dpi=200, bbox_inches='tight')
+plt.savefig('./figures/figS6_cnn_cifar.pdf', bbox_inches='tight')
 plt.close()
 print("Figure S6 saved.")

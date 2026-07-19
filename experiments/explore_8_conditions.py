@@ -315,8 +315,8 @@ def plot_summary(results):
     ax.legend(fontsize=6, ncol=2)
 
     plt.tight_layout()
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/8conditions.png', dpi=150)
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/8conditions.pdf')
+    plt.savefig('./figures/8conditions.png', dpi=150)
+    plt.savefig('./figures/8conditions.pdf')
     print(f"\nFigure saved.")
     plt.show()
 
@@ -338,7 +338,7 @@ def print_table(results):
 
 
 if __name__ == '__main__':
-    os.makedirs('/Users/wangyaoping/Desktop/ml_paper/figures', exist_ok=True)
+    os.makedirs('./figures', exist_ok=True)
 
     # 条件齐全跑一次
     results = run_all(epochs=500)

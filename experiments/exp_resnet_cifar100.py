@@ -1,7 +1,7 @@
 """
 ResNet-18 on CIFAR-100 superclass binary: full RDEP calibration.
 4 channel widths x 5 seeds + null baseline + spectral analysis.
-10 parallel workers. Medium-scale architecture test (JMLR雷区二).
+10 parallel workers. Medium-scale architecture test (architecture test).
 """
 import numpy as np, torch, torch.nn as nn, torch.optim as optim, json, time, os, warnings
 from torchvision import datasets, transforms

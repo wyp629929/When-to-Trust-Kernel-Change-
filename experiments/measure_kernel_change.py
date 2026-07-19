@@ -277,13 +277,13 @@ def plot_analysis():
         plt.colorbar(im, ax=ax, shrink=0.8)
 
     plt.tight_layout()
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/kernel_change_analysis.png', dpi=150)
-    plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/kernel_change_analysis.pdf')
+    plt.savefig('./figures/kernel_change_analysis.png', dpi=150)
+    plt.savefig('./figures/kernel_change_analysis.pdf')
     print("Figure saved.")
     plt.show()
 
 
 if __name__ == '__main__':
     import os
-    os.makedirs('/Users/wangyaoping/Desktop/ml_paper/figures', exist_ok=True)
+    os.makedirs('./figures', exist_ok=True)
     plot_analysis()

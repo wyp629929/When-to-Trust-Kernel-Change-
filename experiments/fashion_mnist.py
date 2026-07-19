@@ -72,7 +72,7 @@ for w in WIDTHS:
         del m
 
 # Save
-with open('/Users/wangyaoping/Desktop/ml_paper/figures/fashion_results.json', 'w') as f:
+with open('./figures/fashion_results.json', 'w') as f:
     json.dump(all_results, f)
 
 # Print summary

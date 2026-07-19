@@ -111,7 +111,7 @@ if __name__ == '__main__':
                       f"CKA={r['cka']:.4f} SVCCA={r['svcca']:.4f} "
                       f"gain={r['delta_err']:.4f}  {elapsed:.0f}s")
 
-    out = '/Users/wangyaoping/Desktop/ml_paper/figures/exp_scaleup_results.json'
+    out = './figures/exp_scaleup_results.json'
     with open(out, 'w') as f:
         json.dump(all_results, f)
     print(f"\n{total} runs complete. Saved to {out}")

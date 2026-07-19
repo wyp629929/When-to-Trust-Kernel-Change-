@@ -77,7 +77,7 @@ if __name__ == '__main__':
             all_results.append(r)
             print(f"[{name}] seed={s}: CKA={r['cka']:.4f} gain={r['delta_err']:.4f} frob={r['frob']:.1f}%")
 
-    out = '/Users/wangyaoping/Desktop/ml_paper/figures/lowfreq_results.json'
+    out = './figures/lowfreq_results.json'
     with open(out, 'w') as f:
         json.dump(all_results, f)
 

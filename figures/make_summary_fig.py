@@ -105,7 +105,7 @@ ax.text(10.5, 1.5, 'Need spectral\nanalysis\n(λ, vᵢ)', ha='center', va='cente
         fontsize=9, color='#555', bbox=dict(boxstyle='round', fc='white', ec='#ccc', alpha=0.8))
 
 plt.tight_layout()
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/fig_reliability_map.png', dpi=200, bbox_inches='tight')
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/fig_reliability_map.pdf', bbox_inches='tight')
+plt.savefig('./figures/fig_reliability_map.png', dpi=200, bbox_inches='tight')
+plt.savefig('./figures/fig_reliability_map.pdf', bbox_inches='tight')
 plt.close()
 print("Reliability Map figure saved.")

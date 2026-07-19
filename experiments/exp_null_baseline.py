@@ -74,7 +74,7 @@ if __name__ == '__main__':
                 all_results.append(r)
                 print(f"[{ds}] w={w} seed={s}: CKA={r['cka']:.4f} Frob={r['frob']:.1f}% ΔErr={r['delta_err']:.4f}")
 
-    out = '/Users/wangyaoping/Desktop/ml_paper/figures/null_baseline_results.json'
+    out = './figures/null_baseline_results.json'
     with open(out, 'w') as f:
         json.dump(all_results, f)
 

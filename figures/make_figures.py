@@ -59,7 +59,7 @@ CMAP = {'poly': '#4C72B0', 'highfreq': '#DD8452', 'gmm': '#55A868'}
 MARKER = {'poly': 'o', 'highfreq': 's', 'gmm': '^'}
 WIDTHS = [32, 64, 128, 256, 512, 1024]
 
-OUTPUT = '/Users/wangyaoping/Desktop/ml_paper/figures'
+OUTPUT = './figures'
 
 # ============================================================
 # Figure 1: Width controls kernel stability

@@ -80,7 +80,7 @@ for w in WIDTHS:
         print(f"[MNIST] w={w} seed={s}: CKA={cka_val:.4f} Frob={frob:.1f}% dErr={delta_err:.4f} {t:.0f}s")
 
 # Save
-out = '/Users/wangyaoping/Desktop/ml_paper/figures/mnist_full_results.json'
+out = './figures/mnist_full_results.json'
 with open(out, 'w') as f:
     json.dump(results, f)
 

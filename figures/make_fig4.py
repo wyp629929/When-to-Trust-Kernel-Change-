@@ -7,8 +7,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 
-cnn = json.load(open('/Users/wangyaoping/Desktop/ml_paper/figures/cnn_cifar_results.json'))
-fashion = json.load(open('/Users/wangyaoping/Desktop/ml_paper/figures/fashion_results.json'))
+cnn = json.load(open('./figures/cnn_cifar_results.json'))
+fashion = json.load(open('./figures/fashion_results.json'))
 
 CMAP_W = {16: '#4C72B0', 32: '#DD8452', 64: '#55A868', 128: '#C44E52', 256: '#937860'}
 W_LABEL = {16: 'W=16', 32: 'W=32', 64: 'W=64', 128: 'W=128', 256: 'W=256'}
@@ -54,7 +54,7 @@ ax2.text(0.95, 0.55, 'Larger ΔK → LESS\nimprovement', transform=ax2.transAxes
          bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, ec='#B85450'))
 
 plt.tight_layout()
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/fig4_real_data.png', dpi=200, bbox_inches='tight')
-plt.savefig('/Users/wangyaoping/Desktop/ml_paper/figures/fig4_real_data.pdf', bbox_inches='tight')
+plt.savefig('./figures/fig4_real_data.png', dpi=200, bbox_inches='tight')
+plt.savefig('./figures/fig4_real_data.pdf', bbox_inches='tight')
 plt.close()
 print("Figure 4 saved.")

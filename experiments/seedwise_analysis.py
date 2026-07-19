@@ -9,7 +9,7 @@ between ΔK and gain should disappear or be near-zero.
 import json, numpy as np
 from scipy.stats import spearmanr
 
-d = json.load(open('/Users/wangyaoping/Desktop/ml_paper/figures/exp_scaleup_results.json'))
+d = json.load(open('./figures/exp_scaleup_results.json'))
 WIDTHS = [32, 64, 128, 256, 512, 1024]
 
 print("=" * 90)
